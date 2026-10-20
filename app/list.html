@@ -17,6 +17,7 @@
     Hal <input type="number" id="pg" min="1" value="1"> / <span id="tp">1</span>
     <button class="btn" id="nx">Berikutnya &rsaquo;</button>
   </div>
+  <button class="btn" id="topBtn" style="position:fixed;right:18px;bottom:18px;display:none;z-index:40;border-radius:999px;padding:10px 16px;box-shadow:0 8px 24px rgba(0,0,0,.18)">↑ Ke atas</button>
 </main>
 <script src="/static/app.js"></script><script src="/static/toast.js"></script>
 <script>
@@ -47,6 +48,14 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight'&&page<pages)go(page+1);
 });
 document.addEventListener('data-changed',()=>go(page));
+const topBtn=$('#topBtn');
+window.addEventListener('scroll',()=>{
+  if(topBtn){
+    if(window.scrollY>400)topBtn.style.display='inline-flex';
+    else topBtn.style.display='none';
+  }
+},{passive:true});
+topBtn&& (topBtn.onclick=()=>window.scrollTo({top:0,behavior:'smooth'}));
 boot().then(()=>{
   $('#q').value=P.get('q')||'';
   if(P.get('size'))$('#sz').value=P.get('size');
