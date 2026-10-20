@@ -49,15 +49,16 @@ $('#q').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(go,250)});
 $('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearQ()});
 $('#qc').onclick=clearQ;
 $('#expCsv').onclick=()=>{
-  const rows=[['Barang','Company','PN','Urutan']];
+  const rows=[['Barang','Company','PN','Urutan','Diinput Oleh']];
   const ths=Array.from(document.querySelectorAll('#head th'));
   document.querySelectorAll('#body tr').forEach(tr=>{
     const nm=tr.querySelector('.nm')?.textContent.replace(/^\d+\s*/,'').trim()||'';
+    const author=tr.querySelector('.author-col')?.textContent.replace(/^👤\s*/,'').trim()||'';
     tr.querySelectorAll('.pn').forEach(pn=>{
       const td=pn.closest('td');
       const colIndex=td?Array.from(tr.children).indexOf(td):-1;
       const comp=colIndex>=0&&ths[colIndex]?ths[colIndex].textContent.trim():'';
-      rows.push([nm,comp,pn.dataset.pn,pn.classList.contains('main')?'0':'1']);
+      rows.push([nm,comp,pn.dataset.pn,pn.classList.contains('main')?'0':'1',author]);
     });
   });
   const csv=rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\r\n');

@@ -6,8 +6,7 @@ const norm=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 const jget=async u=>(await fetch(u)).json();
 const fmt=n=>Number(n||0).toLocaleString('id-ID');
 const csvq=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
-let COMPS=[],STATS={items:0,pns:0,companies:0},LASTDUP=[];
-
+let COMPS=[],STATS={items:0,pns:0,companies:0},LASTDUP=[],CURRENT_USER=null;
 
 function copyText(t){
   const done=()=>toast.success('Disalin',{description:t});
@@ -35,11 +34,72 @@ function cell(list,q){
       :`<button type="button" class="pn rep${hit}" data-pn="${esc(p.pn)}" title="Pengganti ${p.seq} · klik untuk salin" aria-label="Salin PN pengganti ${esc(p.pn)}">↳ ${esc(p.pn)}</button>`;
   }).join('');
 }
-const headHtml=()=>'<tr><th>Barang</th>'+COMPS.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr>';
+const headHtml=()=>'<tr><th>Barang</th>'+COMPS.map(c=>`<th>${esc(c)}</th>`).join('')+'<th class="author-th">Diinput Oleh</th></tr>';
 function rowCells(i,q,no){
   const m={};i.pns.forEach(p=>(m[p.company]=m[p.company]||[]).push(p));
   const nm=i.name?esc(i.name):'<span class="mu">(tanpa nama)</span>';
-  return `<td class="nm">${no?`<span class="no">${no}</span>`:''}${nm}</td>`+COMPS.map(c=>`<td>${cell(m[c],q)}</td>`).join('');
+  const author=i.created_by
+    ?`<span class="badge-user" title="Diinput oleh ${esc(i.created_by)}">👤 ${esc(i.created_by)}</span>`
+    :'<span class="mu">–</span>';
+  return `<td class="nm">${no?`<span class="no">${no}</span>`:''}${nm}</td>`
+    +COMPS.map(c=>`<td>${cell(m[c],q)}</td>`).join('')
+    +`<td class="author-col">${author}</td>`;
+}
+
+async function loadAuth(){
+  try{
+    const r=await jget('/api/auth/me');
+    CURRENT_USER=r.user||null;
+  }catch(e){
+    CURRENT_USER=null;
+  }
+  renderNavAuth();
+}
+
+function renderNavAuth(){
+  const el=$('#navAuth');
+  if(!el)return;
+  if(CURRENT_USER){
+    el.innerHTML=`<span class="user-pill" title="Login sebagai ${esc(CURRENT_USER.username)}">👤 <b>${esc(CURRENT_USER.username)}</b></span><button class="btn sm" id="bLogout">Keluar</button>`;
+    const bLo=$('#bLogout');
+    if(bLo)bLo.onclick=async()=>{
+      await fetch('/api/auth/logout',{method:'POST'});
+      CURRENT_USER=null;
+      renderNavAuth();
+      toast.info('Berhasil keluar');
+      await changed();
+    };
+  }else{
+    el.innerHTML=`<button class="btn sm" id="bLogin">Masuk</button>`;
+    const bLi=$('#bLogin');
+    if(bLi)bLi.onclick=()=>openAuth();
+  }
+}
+
+let authMode='login';
+function setAuthMode(mode){
+  authMode=mode;
+  const tl=$('#tabLogin'),tr=$('#tabRegister'),sub=$('#authSubmit'),sw=$('#authSwitch'),msg=$('#authMsg');
+  if(tl)tl.classList.toggle('on',mode==='login');
+  if(tr)tr.classList.toggle('on',mode==='register');
+  if(sub)sub.textContent=mode==='login'?'Masuk':'Daftar & Masuk';
+  if(sw)sw.innerHTML=mode==='login'
+    ?'Belum punya akun? <a id="authSwitchLink">Daftar akun baru di sini</a>'
+    :'Sudah punya akun? <a id="authSwitchLink">Masuk di sini</a>';
+  const link=$('#authSwitchLink');
+  if(link)link.onclick=()=>setAuthMode(mode==='login'?'register':'login');
+  if(msg){msg.textContent='';msg.className='msg';}
+}
+
+function openAuth(msg,mode='login'){
+  const u=$('#authU'),p=$('#authP'),d=$('#dAuth');
+  if(u)u.value='';
+  if(p)p.value='';
+  setAuthMode(mode);
+  const m=$('#authMsg');
+  if(m&&msg){m.className='msg';m.textContent=msg;}
+  if(d)d.showModal();
+  if(u)u.focus();
 }
 
 async function loadMeta(){
@@ -88,8 +148,10 @@ function chrome(){
   $('#nav').innerHTML=`<a class="brand" href="/"><span class="logo">PN</span><span class="t">Compare PN</span></a>
     <nav><a href="/" class="${pg==='search'?'on':''}">Cari</a><a href="/list" class="${pg==='list'?'on':''}">Daftar</a></nav>
     <span class="sp"></span><span class="mu" id="stats"></span>
+    <span id="navAuth" style="display:inline-flex;align-items:center;gap:6px"></span>
     <select id="thm" class="btn" style="padding:6px 10px">${themes.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('')}</select>
     <button class="btn" id="bImp">Import</button><button class="btn pri" id="bAdd">+ Tambah</button>`;
+  renderNavAuth();
   setTimeout(()=>{$('#thm')&&($('#thm').onchange=e=>applyTheme(e.target.value));},0);
   try{
     const navEl=$('#nav');
@@ -109,6 +171,23 @@ function chrome(){
   }catch(e){}
   document.body.insertAdjacentHTML('beforeend',`
   <datalist id="cl"></datalist><div id="toasts" popover="manual"></div>
+  <dialog id="dAuth">
+    <div class="dh"><h3>Akun Pengguna</h3><button class="x" id="authX" aria-label="Tutup">×</button></div>
+    <div class="auth-tabs">
+      <button class="auth-tab on" id="tabLogin" type="button">Masuk</button>
+      <button class="auth-tab" id="tabRegister" type="button">Daftar Akun Baru</button>
+    </div>
+    <div class="lb">Username</div>
+    <input id="authU" autocomplete="username" placeholder="Masukkan username">
+    <div class="lb">Password</div>
+    <input id="authP" type="password" autocomplete="current-password" placeholder="Minimal 8 karakter">
+    <div id="authMsg" class="msg"></div>
+    <div class="act">
+      <button class="btn" id="authCancel" type="button">Batal</button>
+      <button class="btn pri" id="authSubmit" type="button">Masuk</button>
+    </div>
+    <div class="auth-switch" id="authSwitch">Belum punya akun? <a id="authSwitchLink">Daftar akun baru di sini</a></div>
+  </dialog>
   <dialog id="dAdd">
     <div class="dh"><h3>Tambah barang</h3><button class="x" id="aX" aria-label="Tutup">×</button></div>
     <div class="lb">Nama barang (opsional)</div><input id="aNm" autocomplete="off">
@@ -131,6 +210,46 @@ function chrome(){
     <div class="act"><button class="btn" id="iClose">Tutup</button><button class="btn pri" id="iGo">Upload</button></div>
   </dialog>`);
 
+  // auth dialog event listeners
+  const submitAuth=async()=>{
+    const u=$('#authU').value.trim();
+    const p=$('#authP').value;
+    if(!u){$('#authMsg').className='msg err';$('#authMsg').textContent='Username harus diisi';return}
+    if(!p){$('#authMsg').className='msg err';$('#authMsg').textContent='Password harus diisi';return}
+    $('#authSubmit').disabled=true;
+    try{
+      const endpoint=authMode==='login'?'/api/auth/login':'/api/auth/register';
+      const res=await (await fetch(endpoint,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({username:u,password:p})
+      })).json();
+      if(res.error){
+        $('#authMsg').className='msg err';
+        $('#authMsg').textContent=res.error;
+        toast.error(res.error);
+      }else{
+        CURRENT_USER=res.user;
+        renderNavAuth();
+        $('#dAuth').close();
+        toast.success(authMode==='login'?'Berhasil masuk':'Akun berhasil dibuat & masuk',{description:`Selamat datang, ${CURRENT_USER.username}`});
+        await changed();
+      }
+    }catch(e){
+      $('#authMsg').className='msg err';
+      $('#authMsg').textContent='Terjadi gangguan koneksi';
+    }
+    $('#authSubmit').disabled=false;
+  };
+  $('#authSubmit').onclick=submitAuth;
+  $('#tabLogin').onclick=()=>setAuthMode('login');
+  $('#tabRegister').onclick=()=>setAuthMode('register');
+  $('#authX').onclick=()=>$('#dAuth').close();
+  $('#authCancel').onclick=()=>$('#dAuth').close();
+  $('#dAuth').addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&e.target.tagName==='INPUT'){e.preventDefault();submitAuth()}
+  });
+
   // kepadatan tabel
   const dn=$('#dn');
   if(dn){
@@ -147,6 +266,10 @@ function chrome(){
     $('#aRows').appendChild(d);
   };
   const openAdd=()=>{
+    if(!CURRENT_USER){
+      openAuth('Silakan masuk atau daftar terlebih dahulu untuk menambah data PN.');
+      return;
+    }
     $('#aNm').value='';$('#aMsg').textContent='';$('#aRows').innerHTML='';
     COMPS.forEach(c=>addRow(c,true));if(!COMPS.length){addRow('',false);addRow('',false)}
     $('#dAdd').showModal();($('#aRows .p')||$('#aNm')).focus();
@@ -182,7 +305,13 @@ function chrome(){
 
   // --- import
   const setFile=()=>{const f=$('#iFile').files[0];$('#iName').textContent=f?f.name:'.csv atau .xlsx'};
-  $('#bImp').onclick=()=>{$('#iMsg').textContent='';$('#iRes').innerHTML='';$('#iFile').value='';setFile();$('#dImp').showModal()};
+  $('#bImp').onclick=()=>{
+    if(!CURRENT_USER){
+      openAuth('Silakan masuk atau daftar terlebih dahulu untuk import file PN.');
+      return;
+    }
+    $('#iMsg').textContent='';$('#iRes').innerHTML='';$('#iFile').value='';setFile();$('#dImp').showModal();
+  };
   $('#iX').onclick=$('#iClose').onclick=()=>$('#dImp').close();
   $('#iFile').onchange=setFile;
   const dz=$('#iDrop');
@@ -218,4 +347,4 @@ function chrome(){
     }
   });
 }
-async function boot(){chrome();await loadMeta()}
+async function boot(){chrome();await loadAuth();await loadMeta()}

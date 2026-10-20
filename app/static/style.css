@@ -189,6 +189,18 @@ details.fmt{margin-top:10px;font-size:13px;color:var(--mu)}details.fmt summary{c
   #nav.scrolled { background: linear-gradient(135deg, color-mix(in srgb,var(--card) 74%, transparent), color-mix(in srgb,var(--card) 48%, transparent)); box-shadow: inset 0 1px 1px color-mix(in srgb,#fff 18%, transparent), 0 28px 60px -18px rgba(0,0,0,.9); }
 }
 
+.badge-user{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;padding:2px 8px;border-radius:6px;background:var(--hd);color:var(--tx);font-weight:500;border:1px solid var(--bd);white-space:nowrap}
+table.data th.author-th, table.data td.author-col{min-width:130px;width:140px;white-space:nowrap}
+.user-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;font-size:13px;background:var(--hd);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-weight:600}
+.auth-tabs{display:flex;gap:8px;border-bottom:1px solid var(--bd);margin-bottom:16px}
+.auth-tab{padding:8px 14px;border:0;background:none;color:var(--mu);cursor:pointer;font-weight:600;font-size:15px;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .2s}
+.auth-tab:hover{color:var(--tx)}
+.auth-tab.on{color:var(--ac);border-bottom-color:var(--ac)}
+.auth-switch{text-align:center;margin-top:14px;font-size:13px;color:var(--mu)}
+.auth-switch a{color:var(--ac);text-decoration:none;font-weight:600;cursor:pointer}
+.auth-switch a:hover{text-decoration:underline}
+
+
 @media(max-width:640px){
   /* Header navigation */
   #nav { height: 56px; padding: 0 10px; gap: 6px; }

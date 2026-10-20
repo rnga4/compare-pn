@@ -1,11 +1,13 @@
-import csv, io, os, re, time
+import csv, io, os, re, time, secrets, hashlib
+from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager, asynccontextmanager
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import FastAPI, UploadFile, File, Query
+from fastapi import FastAPI, UploadFile, File, Query, Request, Response
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.gzip import GZipMiddleware
+from pydantic import BaseModel
 
 DSN = os.environ["DATABASE_URL"]
 
@@ -44,6 +46,25 @@ ALTER TABLE part_numbers ADD COLUMN IF NOT EXISTS seq int NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS pn_norm_trgm ON part_numbers USING gin(pn_norm gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS pn_item ON part_numbers(item_id);
 CREATE INDEX IF NOT EXISTS items_name_trgm ON items USING gin(name gin_trgm_ops);
+
+CREATE TABLE IF NOT EXISTS users(
+  id serial PRIMARY KEY,
+  username text UNIQUE NOT NULL,
+  password_hash text NOT NULL,
+  salt text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS sessions(
+  token text PRIMARY KEY,
+  user_id int NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at timestamptz DEFAULT now(),
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_token ON sessions(token);
+CREATE INDEX IF NOT EXISTS sessions_expires ON sessions(expires_at);
+
+ALTER TABLE items ADD COLUMN IF NOT EXISTS user_id int REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS items_user_id ON items(user_id);
 """
 
 @contextmanager
@@ -68,6 +89,40 @@ def split_pns(cell: str):
             seen.add(n)
             out.append(p)
     return out
+
+def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
+    if not salt:
+        salt = secrets.token_hex(16)
+    hashed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000).hex()
+    return hashed, salt
+
+def verify_password(password: str, salt: str, password_hash: str) -> bool:
+    hashed, _ = hash_password(password, salt)
+    return secrets.compare_digest(hashed, password_hash)
+
+def get_current_user(request: Request) -> dict | None:
+    token = request.cookies.get("cmp_session")
+    if not token:
+        return None
+    with conn() as c:
+        row = c.execute("""
+            SELECT u.id, u.username
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = %s AND s.expires_at > now()
+        """, (token,)).fetchone()
+        return dict(row) if row else None
+
+_LOGIN_ATTEMPTS: dict[str, list[float]] = {}
+
+def check_rate_limit(key: str, limit: int = 10, window: int = 60) -> bool:
+    now = time.time()
+    attempts = [t for t in _LOGIN_ATTEMPTS.get(key, []) if now - t < window]
+    if len(attempts) >= limit:
+        return False
+    attempts.append(now)
+    _LOGIN_ATTEMPTS[key] = attempts
+    return True
 
 _STATS_CACHE = {"data": None, "ts": 0}
 _COMPS_CACHE = {"data": None, "ts": 0}
@@ -106,6 +161,70 @@ def stats():
         _STATS_CACHE["ts"] = now
         return data
 
+class AuthBody(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/register")
+def register(body: AuthBody, request: Request, response: Response):
+    u = (body.username or "").strip()
+    p = body.password or ""
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(f"reg:{client_ip}", limit=10, window=60):
+        return {"error": "Terlalu banyak permintaan pendaftaran. Coba 1 menit lagi."}
+    if not re.match(r"^[a-zA-Z0-9_\-\.]{3,30}$", u):
+        return {"error": "Username harus 3-30 karakter (huruf, angka, _, -, .)"}
+    if len(p) < 8:
+        return {"error": "Password minimal 8 karakter"}
+    pw_hash, salt = hash_password(p)
+    with conn() as c:
+        existing = c.execute("SELECT id FROM users WHERE lower(username) = lower(%s)", (u,)).fetchone()
+        if existing:
+            return {"error": f"Username '{u}' sudah dipakai"}
+        user_row = c.execute(
+            "INSERT INTO users(username, password_hash, salt) VALUES (%s, %s, %s) RETURNING id, username",
+            (u, pw_hash, salt)
+        ).fetchone()
+        user_id = user_row["id"]
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+        c.execute("INSERT INTO sessions(token, user_id, expires_at) VALUES (%s, %s, %s)",
+                  (token, user_id, expires_at))
+        response.set_cookie("cmp_session", token, max_age=86400 * 30, httponly=True, samesite="lax", path="/")
+        return {"ok": True, "user": {"id": user_id, "username": user_row["username"]}}
+
+@app.post("/api/auth/login")
+def login(body: AuthBody, request: Request, response: Response):
+    u = (body.username or "").strip()
+    p = body.password or ""
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(f"login:{client_ip}", limit=10, window=60):
+        return {"error": "Terlalu banyak percobaan login gagal. Tunggu 1 menit."}
+    with conn() as c:
+        user = c.execute("SELECT id, username, password_hash, salt FROM users WHERE lower(username) = lower(%s)", (u,)).fetchone()
+        if not user or not verify_password(p, user["salt"], user["password_hash"]):
+            return {"error": "Username atau password salah"}
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+        c.execute("INSERT INTO sessions(token, user_id, expires_at) VALUES (%s, %s, %s)",
+                  (token, user["id"], expires_at))
+        response.set_cookie("cmp_session", token, max_age=86400 * 30, httponly=True, samesite="lax", path="/")
+        return {"ok": True, "user": {"id": user["id"], "username": user["username"]}}
+
+@app.post("/api/auth/logout")
+def logout(request: Request, response: Response):
+    token = request.cookies.get("cmp_session")
+    if token:
+        with conn() as c:
+            c.execute("DELETE FROM sessions WHERE token = %s", (token,))
+    response.delete_cookie("cmp_session", path="/")
+    return {"ok": True}
+
+@app.get("/api/auth/me")
+def me(request: Request):
+    user = get_current_user(request)
+    return {"user": user}
+
 @app.get("/api/search")
 def search(q: str = Query(..., min_length=1), limit: int = 50):
     qn = norm(q)
@@ -116,14 +235,15 @@ def search(q: str = Query(..., min_length=1), limit: int = 50):
               UNION
               SELECT id FROM items WHERE name ILIKE '%%' || %(q)s || '%%'
               LIMIT %(lim)s)
-            SELECT i.id, i.name,
+            SELECT i.id, i.name, u.username AS created_by,
                    json_agg(json_build_object('company', c.name, 'pn', p.pn, 'seq', p.seq)
                             ORDER BY c.id, p.seq) AS pns
             FROM hit h
             JOIN items i ON i.id = h.item_id
+            LEFT JOIN users u ON u.id = i.user_id
             JOIN part_numbers p ON p.item_id = i.id
             JOIN companies c ON c.id = p.company_id
-            GROUP BY i.id, i.name ORDER BY i.name
+            GROUP BY i.id, i.name, u.username ORDER BY i.name
         """, {"qn": qn, "q": q, "lim": min(limit, 500)}).fetchall()
     return rows
 
@@ -142,7 +262,10 @@ def read_rows(filename: str, data: bytes):
             yield [x.strip() for x in r]
 
 @app.post("/api/import")
-async def import_file(file: UploadFile = File(...)):
+async def import_file(request: Request, file: UploadFile = File(...)):
+    user = get_current_user(request)
+    if not user:
+        return {"error": "Silakan login terlebih dahulu untuk import file"}
     rows = read_rows(file.filename or "", await file.read())
     header = next(rows, None)
     if not header or not any(header):
@@ -171,7 +294,8 @@ async def import_file(file: UploadFile = File(...)):
                         pns.append((ids[i], comp_names[i], pn, seq))
             if not pns:
                 continue
-            item_id = c.execute("INSERT INTO items(name) VALUES (%s) RETURNING id", (name or None,)).fetchone()["id"]
+            item_id = c.execute("INSERT INTO items(name, user_id) VALUES (%s, %s) RETURNING id",
+                                (name or None, user["id"])).fetchone()["id"]
             created.add(item_id)
             for cid, cname, pn, seq in pns:
                 cur = c.execute("""INSERT INTO part_numbers(item_id, company_id, pn, pn_norm, seq)
@@ -203,8 +327,6 @@ async def import_file(file: UploadFile = File(...)):
     return {"pn_added": added, "pn_duplicate_skipped": dup,
             "duplicates": dups, "duplicates_truncated": dup > len(dups)}
 
-from pydantic import BaseModel
-
 class Entry(BaseModel):
     company: str
     pns: str
@@ -214,7 +336,10 @@ class NewItem(BaseModel):
     entries: list[Entry]
 
 @app.post("/api/items")
-def add_item(body: NewItem):
+def add_item(body: NewItem, request: Request):
+    user = get_current_user(request)
+    if not user:
+        return {"error": "Silakan login terlebih dahulu untuk menambah data"}
     entries = []
     for e in body.entries:
         comp = e.company.strip()
@@ -233,8 +358,8 @@ def add_item(body: NewItem):
                               (comp, norm(pn))).fetchone()
                 if r:
                     return {"error": f"PN {pn} sudah ada di {comp} (barang: {r['name'] or 'tanpa nama'}, PN {r['pn']})"}
-        item_id = c.execute("INSERT INTO items(name) VALUES (%s) RETURNING id",
-                            ((body.name or "").strip() or None,)).fetchone()["id"]
+        item_id = c.execute("INSERT INTO items(name, user_id) VALUES (%s, %s) RETURNING id",
+                            ((body.name or "").strip() or None, user["id"])).fetchone()["id"]
         added = 0
         for comp, pns in entries:
             cid = c.execute("""INSERT INTO companies(name) VALUES (%s)
@@ -264,15 +389,16 @@ def api_list(page: int = 1, size: int = 50, q: str = ""):
             total = c.execute("SELECT count(*) AS n FROM items").fetchone()["n"]
             rows = c.execute("""
                 WITH pg AS (
-                  SELECT i.id, i.name FROM items i
+                  SELECT i.id, i.name, i.user_id FROM items i
                   ORDER BY i.id LIMIT %(size)s OFFSET %(off)s)
-                SELECT pg.id, pg.name,
+                SELECT pg.id, pg.name, u.username AS created_by,
                        json_agg(json_build_object('company', co.name, 'pn', p.pn, 'seq', p.seq)
                                 ORDER BY co.id, p.seq) AS pns
                 FROM pg
+                LEFT JOIN users u ON u.id = pg.user_id
                 JOIN part_numbers p ON p.item_id = pg.id
                 JOIN companies co ON co.id = p.company_id
-                GROUP BY pg.id, pg.name ORDER BY pg.id
+                GROUP BY pg.id, pg.name, u.username ORDER BY pg.id
             """, {"size": size, "off": offset}).fetchall()
         else:
             qn = norm(q)
@@ -290,15 +416,16 @@ def api_list(page: int = 1, size: int = 50, q: str = ""):
                   UNION
                   SELECT id FROM items WHERE name ILIKE '%%' || %(q)s || '%%'),
                 pg AS (
-                  SELECT i.id, i.name FROM hit h
+                  SELECT i.id, i.name, i.user_id FROM hit h
                   JOIN items i ON i.id = h.id
                   ORDER BY i.id LIMIT %(size)s OFFSET %(off)s)
-                SELECT pg.id, pg.name,
+                SELECT pg.id, pg.name, u.username AS created_by,
                        json_agg(json_build_object('company', co.name, 'pn', p.pn, 'seq', p.seq)
                                 ORDER BY co.id, p.seq) AS pns
                 FROM pg
+                LEFT JOIN users u ON u.id = pg.user_id
                 JOIN part_numbers p ON p.item_id = pg.id
                 JOIN companies co ON co.id = p.company_id
-                GROUP BY pg.id, pg.name ORDER BY pg.id
+                GROUP BY pg.id, pg.name, u.username ORDER BY pg.id
             """, params).fetchall()
     return {"total": total, "page": page, "size": size, "items": rows}
