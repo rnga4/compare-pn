@@ -1,8 +1,7 @@
 <!doctype html>
 <html lang="id"><head><meta charset="utf-8"><title>Compare PN</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/static/style.css">
-<link rel="stylesheet" href="/static/template.css"></head>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="stylesheet" href="/static/style.css"></head>
 <body data-page="search"><header id="nav"></header>
 <main>
   <section class="hero">
@@ -51,12 +50,13 @@ $('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearQ()});
 $('#qc').onclick=clearQ;
 $('#expCsv').onclick=()=>{
   const rows=[['Barang','Company','PN','Urutan']];
+  const ths=Array.from(document.querySelectorAll('#head th'));
   document.querySelectorAll('#body tr').forEach(tr=>{
     const nm=tr.querySelector('.nm')?.textContent.replace(/^\d+\s*/,'').trim()||'';
     tr.querySelectorAll('.pn').forEach(pn=>{
       const td=pn.closest('td');
-      const th=td?Array.from(document.querySelectorAll('#head th')).find((th,i)=>document.querySelectorAll('#body tr')[0].children[i]===td):null;
-      const comp=th?th.textContent.trim():'';
+      const colIndex=td?Array.from(tr.children).indexOf(td):-1;
+      const comp=colIndex>=0&&ths[colIndex]?ths[colIndex].textContent.trim():'';
       rows.push([nm,comp,pn.dataset.pn,pn.classList.contains('main')?'0':'1']);
     });
   });
@@ -79,33 +79,3 @@ boot().then(()=>{
 });
 </script></body></html>
 
-<script>
-// search history
-const histKey='cmp-search-hist';
-function addHist(q){
-  if(!q)return;
-  try{
-    const h=JSON.parse(localStorage.getItem(histKey)||'[]').filter(x=>x!==q);
-    h.unshift(q);localStorage.setItem(histKey,JSON.stringify(h.slice(0,10)));
-  }catch(e){}
-}
-const origGo=go;
-go=async function(){
-  const q=$('#q').value.trim();
-  if(q)addHist(q);
-  return origGo.apply(this,arguments);
-};
-// simple dropdown
-$('#q').addEventListener('focus',()=>{
-  if(!$('#q').value.trim()) { const d=document.getElementById('qhist'); if(d) d.remove(); return; }
-  try{
-    const h=JSON.parse(localStorage.getItem(histKey)||'[]');
-    if(!h.length)return;
-    let d=document.getElementById('qhist');
-    if(!d){d=document.createElement('div');d.id='qhist';d.style.cssText='position:absolute;left:0;right:0;top:100%;margin-top:8px;background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.16);z-index:60;overflow:hidden;backdrop-filter:blur(8px)';$('#q').parentElement.style.position='relative';$('#q').parentElement.appendChild(d);}
-    d.innerHTML=h.map(x=>`<div style="padding:7px 12px;cursor:pointer;font-size:14px" data-q="${esc(x)}">${esc(x)}</div>`).join('');
-    d.querySelectorAll('div').forEach(el=>el.onclick=()=>{$('#q').value=el.dataset.q;d.remove();origGo();});
-  }catch(e){}
-});
-document.addEventListener('click',e=>{if(!e.target.closest('.sb')){const d=document.getElementById('qhist');if(d)d.remove();}});
-</script>

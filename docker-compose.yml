@@ -26,6 +26,8 @@ services:
       DATABASE_URL: postgresql://cmp:cmp_pass@db:5432/comparepn
     ports:
       - "8102:8000"
+    volumes:
+      - ./app:/srv/app
 
 volumes:
   pgdata:

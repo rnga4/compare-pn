@@ -1,28 +1,37 @@
 <!doctype html>
 <html lang="id"><head><meta charset="utf-8"><title>Daftar PN</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/static/style.css">
-<link rel="stylesheet" href="/static/template.css"></head>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="stylesheet" href="/static/style.css"></head>
 <body data-page="list"><header id="nav"></header>
 <main>
   <div class="bar">
-    <input class="f" id="q" autocomplete="off" placeholder="Filter PN atau nama barang (kosong = semua)">
+    <div style="position:relative;flex:1;min-width:200px">
+      <input class="f" id="q" autocomplete="off" placeholder="Filter PN atau nama barang (kosong = semua)" style="width:100%;padding-right:36px">
+      <button class="qc" id="qc" hidden aria-label="Hapus filter" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">×</button>
+    </div>
     <select id="sz"><option value="25">25 / hal</option><option value="50" selected>50 / hal</option><option value="100">100 / hal</option></select>
     <button class="btn" id="dn">Rapat</button>
   </div>
-  <div class="tw grow"><table class="data"><thead id="head"></thead><tbody id="body"></tbody></table></div>
-  <div class="pager">
+  <div class="tw grow" id="tw"><table class="data"><thead id="head"></thead><tbody id="body"></tbody></table></div>
+  <div id="empty"></div>
+  <div class="pager" id="pager">
     <span class="mu" id="info"></span><span class="sp"></span>
     <button class="btn" id="pv">&lsaquo; Sebelumnya</button>
     Hal <input type="number" id="pg" min="1" value="1"> / <span id="tp">1</span>
     <button class="btn" id="nx">Berikutnya &rsaquo;</button>
   </div>
-  <button class="btn" id="topBtn" style="position:fixed;right:18px;bottom:18px;display:none;z-index:40;border-radius:999px;padding:10px 16px;box-shadow:0 8px 24px rgba(0,0,0,.18)">↑ Ke atas</button>
+  <button class="btn top-btn" id="topBtn" aria-label="Ke atas">↑ Ke atas</button>
 </main>
 <script src="/static/app.js"></script><script src="/static/toast.js"></script>
 <script>
 let page=1,pages=1,t;
 const P=new URLSearchParams(location.search);
+function clearFilter(){
+  $('#q').value='';
+  $('#qc').hidden=true;
+  go(1);
+  $('#q').focus();
+}
 async function go(p){
   page=Math.max(1,p||1);
   const size=$('#sz').value,q=$('#q').value.trim();
@@ -30,18 +39,39 @@ async function go(p){
   pages=Math.max(1,Math.ceil(r.total/r.size));
   if(page>pages)return go(pages);
   history.replaceState(null,'',`?page=${page}&size=${size}`+(q?'&q='+encodeURIComponent(q):''));
+  $('#qc').hidden=!$('#q').value;
+
+  const hasItems=r.total>0;
+  $('#tw').hidden=!hasItems;
+  $('#pager').hidden=!hasItems;
+
+  if(!hasItems){
+    $('#empty').innerHTML=q
+      ?`<div class="empty">Tidak ada barang yang cocok dengan filter <code>${esc(q)}</code>.<br><button class="btn sm" id="resetQ" style="margin-top:12px">Reset Filter</button></div>`
+      :`<div class="empty">Belum ada data barang.<br>Tambahkan lewat menu <b>+ Tambah</b> atau <b>Import</b>.</div>`;
+    const b=$('#resetQ');
+    if(b)b.onclick=clearFilter;
+    return;
+  }
+
+  $('#empty').innerHTML='';
   $('#pg').value=page;$('#tp').textContent=fmt(pages);
   $('#pv').disabled=page<=1;$('#nx').disabled=page>=pages;
   const from=r.total?(page-1)*r.size+1:0,to=Math.min(page*r.size,r.total);
   $('#info').textContent=`${fmt(from)}-${fmt(to)} dari ${fmt(r.total)} barang`;
   $('#head').innerHTML=typeof headHtml==='function'?headHtml():'';
-  $('#body').innerHTML=r.items.map((i,n)=>'<tr>'+rowCells(i,q,from+n)+'</tr>').join('')
-    ||`<tr><td colspan="99" class="empty">${(typeof STATS!=='undefined'&&STATS.items)?'Tidak ada hasil untuk filter ini':'Belum ada data.'}</td></tr>`;
+  $('#body').innerHTML=r.items.map((i,n)=>'<tr>'+rowCells(i,q,from+n)+'</tr>').join('');
   $('.tw').scrollTop=0;
 }
 $('#pv').onclick=()=>go(page-1);$('#nx').onclick=()=>go(page+1);
 $('#pg').onchange=e=>go(+e.target.value);$('#sz').onchange=()=>go(1);
-$('#q').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>go(1),300)});
+$('#qc').onclick=clearFilter;
+$('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearFilter();});
+$('#q').addEventListener('input',()=>{
+  $('#qc').hidden=!$('#q').value;
+  clearTimeout(t);
+  t=setTimeout(()=>go(1),300);
+});
 document.addEventListener('keydown',e=>{
   if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)||document.querySelector('dialog[open]'))return;
   if(e.key==='ArrowLeft'&&page>1)go(page-1);
@@ -49,10 +79,17 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('data-changed',()=>go(page));
 const topBtn=document.getElementById('topBtn');
-window.addEventListener('scroll',()=>{if(topBtn){if(window.scrollY>400)topBtn.style.display='inline-flex';else topBtn.style.display='none';}},{passive:true});
-if(topBtn)topBtn.onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
+const twEl=document.querySelector('.tw');
+if(twEl&&topBtn){
+  twEl.addEventListener('scroll',()=>{
+    if(twEl.scrollTop>300)topBtn.classList.add('visible');
+    else topBtn.classList.remove('visible');
+  },{passive:true});
+  topBtn.onclick=()=>twEl.scrollTo({top:0,behavior:'smooth'});
+}
 boot().then(()=>{
   $('#q').value=P.get('q')||'';
+  $('#qc').hidden=!$('#q').value;
   if(P.get('size'))$('#sz').value=P.get('size');
   go(+P.get('page')||1);
 });

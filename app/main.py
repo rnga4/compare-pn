@@ -92,7 +92,10 @@ def read_rows(filename: str, data: bytes):
         for r in wb.active.iter_rows(values_only=True):
             yield ["" if v is None else str(v).strip() for v in r]
     else:
-        text = data.decode("utf-8-sig")
+        try:
+            text = data.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = data.decode("latin-1", errors="replace")
         for r in csv.reader(io.StringIO(text)):
             yield [x.strip() for x in r]
 

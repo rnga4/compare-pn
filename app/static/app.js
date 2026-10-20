@@ -11,11 +11,17 @@ let COMPS=[],STATS={items:0,pns:0,companies:0},LASTDUP=[];
 
 function copyText(t){
   const done=()=>toast.success('Disalin',{description:t});
-  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(done);return}
-  const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';
-  document.body.appendChild(a);a.select();
-  try{document.execCommand('copy');done()}catch(e){toast.error('Gagal menyalin')}
-  a.remove();
+  const fallback=()=>{
+    const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';
+    document.body.appendChild(a);a.select();
+    try{document.execCommand('copy');done()}catch(e){toast.error('Gagal menyalin')}
+    a.remove();
+  };
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(t).then(done).catch(fallback);
+  }else{
+    fallback();
+  }
 }
 document.addEventListener('click',e=>{const p=e.target.closest('.pn');if(p)copyText(p.dataset.pn)});
 
@@ -51,7 +57,7 @@ function showRes(r){
   if(LASTDUP.length){
     const rows=LASTDUP.map(x=>`<tr><td>${x.row}</td><td>${esc(x.company)}</td><td><b>${esc(x.pn)}</b></td>
       <td>${x.source==='file'?'dobel di file ini':'sudah ada di database'}</td>
-      <td>${x.existing_name?esc(x.existing_name):'<span class="mu">—</span>'}</td>
+      <td>${x.existing_name?esc(x.existing_name):'<span class="mu">-</span>'}</td>
       <td>${(x.existing_pns||[]).map(p=>`<span class="mu">${esc(p.company)}:</span> ${esc(p.pn)}`).join('<br>')}</td></tr>`).join('');
     h+=`<div class="hint">Baris = nomor baris di file. ${r.duplicates_truncated?'Menampilkan 2000 pertama. ':''}
       <button class="btn sm" id="iCsv">Download daftar dobel (CSV)</button></div>
@@ -109,7 +115,7 @@ function chrome(){
     <div class="lb">PN per company</div>
     <div id="aRows"></div>
     <button class="btn sm" id="aMore">+ company lain</button>
-    <div class="hint">Pengganti: pisah pakai <code>;</code> &mdash; contoh <code>002;002A;002B</code> (pertama = utama). Kosongkan company yang tidak punya PN.</div>
+    <div class="hint">Pengganti: pisah pakai <code>;</code>, contoh <code>002;002A;002B</code> (pertama = utama). Kosongkan company yang tidak punya PN.</div>
     <div id="aMsg" class="msg"></div>
     <div class="act"><button class="btn" id="aSave">Simpan</button><button class="btn pri" id="aSave2">Simpan &amp; lanjut</button></div>
   </dialog>

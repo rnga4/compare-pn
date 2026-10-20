@@ -1,5 +1,12 @@
 :root{--bg:#f6f7f9;--card:#fff;--tx:#1a1d21;--mu:#6b7280;--bd:#e3e6ea;--ac:#2563eb;--acbg:#e8efff;--mk:#fff0a0;--ok:#16a34a;--er:#dc2626;--wn:#d97706;--hd:#f0f2f5}
 @media(prefers-color-scheme:dark){:root{--bg:#0f1216;--card:#181c22;--tx:#e8eaed;--mu:#9ca8b6;--bd:#2a3039;--ac:#6ea0ff;--acbg:#1d2a48;--mk:#6b5800;--wn:#f59e0b;--hd:#1f242c}}
+body.dark{--bg:#0f1216;--card:#181c22;--tx:#e8eaed;--mu:#9ca8b6;--bd:#2a3039;--ac:#6ea0ff;--acbg:#1d2a48;--mk:#6b5800;--ok:#22c55e;--er:#ef4444;--wn:#f59e0b;--hd:#1f242c}
+body.theme-sakura{--bg:#fdf2f4;--card:#ffffff;--tx:#4a1525;--mu:#8a4d5e;--bd:#f3d1d9;--ac:#d94668;--acbg:#ffe4eb;--mk:#fef08a;--ok:#15803d;--er:#b91c1c;--wn:#b45309;--hd:#fbe4e9}
+body.theme-bamboo{--bg:#f2f7f2;--card:#ffffff;--tx:#163319;--mu:#4f6e52;--bd:#d2e3d3;--ac:#2d7a36;--acbg:#e1f0e2;--mk:#fef08a;--ok:#15803d;--er:#b91c1c;--wn:#b45309;--hd:#e4eee4}
+body.theme-cyberpunk{--bg:#0d0e15;--card:#141724;--tx:#f0f4fc;--mu:#8d98b8;--bd:#2a3048;--ac:#00d4ff;--acbg:#00344d;--mk:#544600;--ok:#00ff88;--er:#ff3366;--wn:#ffaa00;--hd:#1c2033}
+body.theme-mingyu{--bg:#fbf8f3;--card:#ffffff;--tx:#2c2214;--mu:#756550;--bd:#e8dfd1;--ac:#b45309;--acbg:#fef3c7;--mk:#fef08a;--ok:#15803d;--er:#b91c1c;--wn:#b45309;--hd:#f3ede2}
+body.theme-ocean{--bg:#f0f7fb;--card:#ffffff;--tx:#0f2c3d;--mu:#4b6f84;--bd:#cfe0eb;--ac:#0284c7;--acbg:#e0f2fe;--mk:#fef08a;--ok:#15803d;--er:#b91c1c;--wn:#b45309;--hd:#e1eef6}
+body.theme-retrolight{--bg:#f7f6f2;--card:#ffffff;--tx:#212529;--mu:#606770;--bd:#dedcd4;--ac:#4f46e5;--acbg:#eeedfd;--mk:#fef08a;--ok:#15803d;--er:#b91c1c;--wn:#b45309;--hd:#eceae2}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
@@ -46,10 +53,9 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
 table{border-collapse:separate;border-spacing:0;width:100%}
 th,td{padding:11px 16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--bd);font-size:15px;line-height:1.6}
 .compact th,.compact td{padding:6px 12px;font-size:14px}
-thead th{position:sticky;top:0;z-index:3;background:var(--hd);white-space:normal;word-wrap:break-word;overflow-wrap:break-word;hyphens:auto;line-height:1.45}
-table.data td.nm,table.data thead th:first-child{position:sticky;left:0;min-width:220px;max-width:380px;width:260px;white-space:normal;word-wrap:break-word;overflow-wrap:break-word}
-table.data td.nm{z-index:1;background:var(--card)}
-table.data thead th:first-child{z-index:4}
+thead th{position:sticky;top:0;z-index:140;background:var(--hd);white-space:normal;word-wrap:break-word;overflow-wrap:break-word;hyphens:auto;line-height:1.45}
+table.data td.nm{position:sticky;left:0;min-width:220px;max-width:380px;width:260px;white-space:normal;word-wrap:break-word;overflow-wrap:break-word;z-index:150;background:var(--card)!important;border-right:1px solid var(--bd)}
+table.data thead th:first-child{position:sticky;left:0;top:0;min-width:220px;max-width:380px;width:260px;white-space:normal;word-wrap:break-word;overflow-wrap:break-word;z-index:160;background:var(--hd)!important;border-right:1px solid var(--bd)}
 table.data th:not(:first-child),table.data td:not(.nm){min-width:220px}
 tbody tr:hover td{background:var(--acbg)}
 .no{display:inline-block;min-width:34px;margin-right:6px;color:var(--mu);font-size:12px}
@@ -106,22 +112,7 @@ details.fmt{margin-top:10px;font-size:13px;color:var(--mu)}details.fmt summary{c
 .sn:hover .sn-x{opacity:1}
 .sn-sp{display:block;width:16px;height:16px;margin:1px;border:2px solid var(--bd);border-top-color:var(--tx);border-radius:50%;animation:snspin .8s linear infinite}
 @keyframes snspin{to{transform:rotate(360deg)}}
-@media(max-width:640px){
-  header#nav{padding:8px 12px;gap:8px}
-  .brand .t,#stats{display:none}
-  nav{margin-left:0}
-  main{padding:12px;max-width:100%;overflow-x:hidden}
-  .hero{margin-top:6vh}.hero h1{font-size:28px}.hero p{font-size:16px}
-  .sb input{font-size:18px;padding:14px 52px 14px 18px}
-  #bAdd{position:fixed;right:16px;bottom:16px;z-index:30;border-radius:999px;padding:13px 20px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
-  #toasts{inset:auto 12px 80px 12px;width:auto}
-  .r{grid-template-columns:90px 1fr 28px}
-  .stats{flex-direction:column}
-  .pager .mu{width:100%}
-  .tw{max-width:100vw}
-  table.data td.nm,table.data thead th:first-child{min-width:120px;max-width:160px}
-  th,td{font-size:14.5px;padding:10px 12px}
-}
+
 
 /* =====================================================================
    TOPBAR LIQUID GLASS (inspired by absensi-web)
@@ -198,20 +189,45 @@ details.fmt{margin-top:10px;font-size:13px;color:var(--mu)}details.fmt summary{c
   #nav.scrolled { background: linear-gradient(135deg, color-mix(in srgb,var(--card) 74%, transparent), color-mix(in srgb,var(--card) 48%, transparent)); box-shadow: inset 0 1px 1px color-mix(in srgb,#fff 18%, transparent), 0 28px 60px -18px rgba(0,0,0,.9); }
 }
 
-@media (max-width:640px){
-  #nav { height:60px; padding:0 14px; gap:8px; }
-  #nav.scrolled { width:calc(100% - 20px); margin:8px auto; top:8px; }
-  #nav .brand .t { display:none; }
-  #nav nav { margin-left:0; }
+@media(max-width:640px){
+  /* Header navigation */
+  #nav { height: 56px; padding: 0 10px; gap: 6px; }
+  #nav.scrolled { width: calc(100% - 16px); margin: 6px auto; top: 6px; }
+  #nav .brand .t, #stats { display: none; }
+  #nav nav { margin-left: 0; gap: 2px; }
+  #nav nav a { padding: 5px 9px; font-size: 13px; }
+  #nav .btn, #nav select.btn { font-size: 12.5px; padding: 5px 9px; }
+
+  /* Main container & search */
+  main { padding: 10px; max-width: 100%; overflow-x: hidden; }
+  .hero { margin-top: 4vh; }
+  .hero h1 { font-size: 26px; }
+  .hero p { font-size: 15px; margin-bottom: 16px; }
+  .sb input { font-size: 16px; padding: 12px 42px 12px 14px; border-radius: 12px; }
+  .sb kbd { display: none; }
+  .qc { width: 32px; height: 32px; font-size: 20px; right: 6px; }
+
+  /* Floating Action Button (+ Tambah) & Top Button with safe area insets */
+  #bAdd { position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom, 16px)); z-index: 30; border-radius: 999px; padding: 12px 18px; font-size: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+  .top-btn { right: 16px; bottom: calc(max(16px, env(safe-area-inset-bottom, 16px)) + 60px); padding: 8px 14px; font-size: 13px; }
+  #toasts { inset: auto 12px calc(max(16px, env(safe-area-inset-bottom, 16px)) + 64px) 12px; width: auto; }
+
+  /* Table optimizations */
+  .tw { max-width: 100%; width: 100%; }
+  table.data td.nm, table.data thead th:first-child { min-width: 110px; max-width: 140px; width: 125px; font-size: 13.5px; padding: 9px 10px; }
+  table.data th:not(:first-child), table.data td:not(.nm) { min-width: 150px; font-size: 13.5px; padding: 9px 10px; }
+  .pn { min-height: 34px; padding: 5px 9px; font-size: 13.5px; margin: 2px 4px 2px 0; }
+  .compact th, .compact td { padding: 5px 8px; font-size: 12.5px; }
+
+  /* Dialogs and form controls */
+  dialog { padding: 16px; width: min(520px, 95vw); }
+  .x { min-width: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; }
+  .r { grid-template-columns: 100px 1fr 32px; gap: 6px; }
+  .stats { flex-direction: column; }
+  .pager { gap: 6px; }
+  .pager .mu { width: 100%; text-align: center; }
+  .bar { gap: 6px; }
+  .bar .btn.sm { min-height: 36px; padding: 6px 12px; font-size: 13px; }
 }
 
-/* micro animations */
-*{transition:background-color .2s ease,color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .2s ease,opacity .2s ease}
-.btn:active{transform:translateY(1px) scale(.99)}
-.card,.pn,.sn{animation:fadeInUp .25s ease both}
-@keyframes fadeInUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-tr{animation:fadeInRow .18s ease both}
-@keyframes fadeInRow{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-
-#qhist div:hover{background:var(--hd)}
-#qhist{max-height:280px;overflow:auto}
+.tw { isolation: isolate; }
