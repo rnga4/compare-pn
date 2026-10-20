@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><title>Compare PN</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/template.css"></head>
+<body data-page="search"><header id="nav"></header>
+<main>
+  <section class="hero">
+    <h1>Cari PN</h1>
+    <p class="mu">Ketik PN dari company mana pun, hasilnya menampilkan PN barang itu di semua company.</p>
+    <div class="sb">
+      <input id="q" autofocus autocomplete="off" placeholder="Ketik PN atau nama barang…">
+      <kbd id="kb">/</kbd><button class="qc" id="qc" hidden aria-label="Hapus">×</button>
+    </div>
+  </section>
+  <div class="bar" id="rbar" hidden><span class="mu" id="info"></span><span class="sp"></span><button class="btn sm" id="dn">Rapat</button></div>
+  <div class="tw" id="tw" hidden><table class="data"><thead id="head"></thead><tbody id="body"></tbody></table></div>
+  <div id="empty"></div>
+</main>
+<script src="/static/app.js"></script><script src="/static/toast.js"></script>
+<script>
+let t,seq=0;
+const EMPTY_DB=`<div class="cta"><h3>Belum ada data</h3><div class="mu">Mulai dengan salah satu cara ini:</div>
+  <div class="cards">
+    <button class="card" onclick="$('#bImp').click()"><b>Import file</b><span>Excel / CSV, ratusan ribu baris sekaligus</span></button>
+    <button class="card" onclick="$('#bAdd').click()"><b>Tambah manual</b><span>Isi PN per company satu per satu</span></button>
+  </div></div>`;
+function clearQ(){$('#q').value='';go();$('#q').focus()}
+async function go(){
+  const raw=$('#q').value,q=raw.trim(),my=++seq;
+  document.body.classList.toggle('has-q',!!q);
+  $('#qc').hidden=!raw;$('#kb').hidden=!!raw;
+  history.replaceState(null,'',q?'?q='+encodeURIComponent(q):location.pathname);
+  if(!q){
+    $('#tw').hidden=$('#rbar').hidden=true;
+    $('#empty').innerHTML=STATS.items
+      ?`<div class="empty">${fmt(STATS.items)} barang · ${fmt(STATS.pns)} PN · ${STATS.companies} company tersimpan.<br>Lihat semuanya di <a href="/list">Daftar</a>.</div>`
+      :EMPTY_DB;
+    return;
+  }
+  const r=await jget('/api/search?q='+encodeURIComponent(q));
+  if(my!==seq)return;
+  $('#head').innerHTML=headHtml();
+  $('#body').innerHTML=r.map(i=>'<tr>'+rowCells(i,q)+'</tr>').join('');
+  $('#tw').hidden=$('#rbar').hidden=!r.length;
+  $('#info').textContent=`${fmt(r.length)} barang ditemukan${r.length>=50?' (maks 50, persempit pencarian)':''} · klik PN untuk menyalin`;
+  $('#empty').innerHTML=r.length?'':`<div class="empty">Tidak ada hasil untuk <code>${esc(q)}</code>. Cek ejaan, atau tambahkan lewat <b>+ Tambah</b>.</div>`;
+}
+$('#q').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(go,250)});
+$('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearQ()});
+$('#qc').onclick=clearQ;
+document.addEventListener('data-changed',go);
+boot().then(()=>{
+  const q=new URLSearchParams(location.search).get('q');
+  if(q)$('#q').value=q;
+  go();
+});
+</script></body></html>

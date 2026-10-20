@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: compare-pn-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cmp
+      POSTGRES_PASSWORD: cmp_pass
+      POSTGRES_DB: comparepn
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cmp -d comparepn"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    container_name: compare-pn-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://cmp:cmp_pass@db:5432/comparepn
+    ports:
+      - "8102:8000"
+
+volumes:
+  pgdata:

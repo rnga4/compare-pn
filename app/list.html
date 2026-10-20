@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><title>Daftar PN</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/template.css"></head>
+<body data-page="list"><header id="nav"></header>
+<main>
+  <div class="bar">
+    <input class="f" id="q" autocomplete="off" placeholder="Filter PN atau nama barang (kosong = semua)">
+    <select id="sz"><option value="25">25 / hal</option><option value="50" selected>50 / hal</option><option value="100">100 / hal</option></select>
+    <button class="btn" id="dn">Rapat</button>
+  </div>
+  <div class="tw grow"><table class="data"><thead id="head"></thead><tbody id="body"></tbody></table></div>
+  <div class="pager">
+    <span class="mu" id="info"></span><span class="sp"></span>
+    <button class="btn" id="pv">&lsaquo; Sebelumnya</button>
+    Hal <input type="number" id="pg" min="1" value="1"> / <span id="tp">1</span>
+    <button class="btn" id="nx">Berikutnya &rsaquo;</button>
+  </div>
+</main>
+<script src="/static/app.js"></script><script src="/static/toast.js"></script>
+<script>
+let page=1,pages=1,t;
+const P=new URLSearchParams(location.search);
+async function go(p){
+  page=Math.max(1,p||1);
+  const size=$('#sz').value,q=$('#q').value.trim();
+  const r=await jget(`/api/list?page=${page}&size=${size}&q=${encodeURIComponent(q)}`);
+  pages=Math.max(1,Math.ceil(r.total/r.size));
+  if(page>pages)return go(pages);
+  history.replaceState(null,'',`?page=${page}&size=${size}`+(q?'&q='+encodeURIComponent(q):''));
+  $('#pg').value=page;$('#tp').textContent=fmt(pages);
+  $('#pv').disabled=page<=1;$('#nx').disabled=page>=pages;
+  const from=r.total?(page-1)*r.size+1:0,to=Math.min(page*r.size,r.total);
+  $('#info').textContent=`${fmt(from)}-${fmt(to)} dari ${fmt(r.total)} barang`;
+  $('#head').innerHTML=headHtml();
+  $('#body').innerHTML=r.items.map((i,n)=>'<tr>'+rowCells(i,q,from+n)+'</tr>').join('')
+    ||`<tr><td colspan="99" class="empty">${STATS.items?'Tidak ada hasil untuk filter ini':'Belum ada data. Klik Import atau + Tambah.'}</td></tr>`;
+  $('.tw').scrollTop=0;
+}
+$('#pv').onclick=()=>go(page-1);$('#nx').onclick=()=>go(page+1);
+$('#pg').onchange=e=>go(+e.target.value);$('#sz').onchange=()=>go(1);
+$('#q').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(()=>go(1),300)});
+document.addEventListener('keydown',e=>{
+  if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)||document.querySelector('dialog[open]'))return;
+  if(e.key==='ArrowLeft'&&page>1)go(page-1);
+  if(e.key==='ArrowRight'&&page<pages)go(page+1);
+});
+document.addEventListener('data-changed',()=>go(page));
+boot().then(()=>{
+  $('#q').value=P.get('q')||'';
+  if(P.get('size'))$('#sz').value=P.get('size');
+  go(+P.get('page')||1);
+});
+</script></body></html>
