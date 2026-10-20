@@ -34,9 +34,9 @@ async function go(p){
   $('#pv').disabled=page<=1;$('#nx').disabled=page>=pages;
   const from=r.total?(page-1)*r.size+1:0,to=Math.min(page*r.size,r.total);
   $('#info').textContent=`${fmt(from)}-${fmt(to)} dari ${fmt(r.total)} barang`;
-  $('#head').innerHTML=headHtml();
+  $('#head').innerHTML=typeof headHtml==='function'?headHtml():'';
   $('#body').innerHTML=r.items.map((i,n)=>'<tr>'+rowCells(i,q,from+n)+'</tr>').join('')
-    ||`<tr><td colspan="99" class="empty">${STATS.items?'Tidak ada hasil untuk filter ini':'Belum ada data. Klik Import atau + Tambah.'}</td></tr>`;
+    ||`<tr><td colspan="99" class="empty">${(typeof STATS!=='undefined'&&STATS.items)?'Tidak ada hasil untuk filter ini':'Belum ada data.'}</td></tr>`;
   $('.tw').scrollTop=0;
 }
 $('#pv').onclick=()=>go(page-1);$('#nx').onclick=()=>go(page+1);
@@ -48,17 +48,13 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight'&&page<pages)go(page+1);
 });
 document.addEventListener('data-changed',()=>go(page));
-const topBtn=$('#topBtn');
-window.addEventListener('scroll',()=>{
-  if(topBtn){
-    if(window.scrollY>400)topBtn.style.display='inline-flex';
-    else topBtn.style.display='none';
-  }
-},{passive:true});
-topBtn&& (topBtn.onclick=()=>window.scrollTo({top:0,behavior:'smooth'}));
+const topBtn=document.getElementById('topBtn');
+window.addEventListener('scroll',()=>{if(topBtn){if(window.scrollY>400)topBtn.style.display='inline-flex';else topBtn.style.display='none';}},{passive:true});
+if(topBtn)topBtn.onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
 boot().then(()=>{
   $('#q').value=P.get('q')||'';
   if(P.get('size'))$('#sz').value=P.get('size');
   go(+P.get('page')||1);
 });
-</script></body></html>
+</script>
+</body></html>

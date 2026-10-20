@@ -204,3 +204,14 @@ details.fmt{margin-top:10px;font-size:13px;color:var(--mu)}details.fmt summary{c
   #nav .brand .t { display:none; }
   #nav nav { margin-left:0; }
 }
+
+/* micro animations */
+*{transition:background-color .2s ease,color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .2s ease,opacity .2s ease}
+.btn:active{transform:translateY(1px) scale(.99)}
+.card,.pn,.sn{animation:fadeInUp .25s ease both}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+tr{animation:fadeInRow .18s ease both}
+@keyframes fadeInRow{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+#qhist div:hover{background:var(--hd)}
+#qhist{max-height:280px;overflow:auto}

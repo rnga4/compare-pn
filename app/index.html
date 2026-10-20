@@ -13,7 +13,7 @@
       <kbd id="kb">/</kbd><button class="qc" id="qc" hidden aria-label="Hapus">×</button>
     </div>
   </section>
-  <div class="bar" id="rbar" hidden><span class="mu" id="info"></span><span class="sp"></span><button class="btn sm" id="dn">Rapat</button></div>
+    <div class="bar" id="rbar" hidden><span class="mu" id="info"></span><span class="sp"></span><button class="btn sm" id="cpyAll">Salin Semua PN</button><button class="btn sm" id="expCsv">Export CSV</button><button class="btn sm" id="dn">Rapat</button></div>
   <div class="tw" id="tw" hidden><table class="data"><thead id="head"></thead><tbody id="body"></tbody></table></div>
   <div id="empty"></div>
 </main>
@@ -49,6 +49,28 @@ async function go(){
 $('#q').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(go,250)});
 $('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearQ()});
 $('#qc').onclick=clearQ;
+$('#expCsv').onclick=()=>{
+  const rows=[['Barang','Company','PN','Urutan']];
+  document.querySelectorAll('#body tr').forEach(tr=>{
+    const nm=tr.querySelector('.nm')?.textContent.replace(/^\d+\s*/,'').trim()||'';
+    tr.querySelectorAll('.pn').forEach(pn=>{
+      const td=pn.closest('td');
+      const th=td?Array.from(document.querySelectorAll('#head th')).find((th,i)=>document.querySelectorAll('#body tr')[0].children[i]===td):null;
+      const comp=th?th.textContent.trim():'';
+      rows.push([nm,comp,pn.dataset.pn,pn.classList.contains('main')?'0':'1']);
+    });
+  });
+  const csv=rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='hasil-pencarian.csv';a.click();
+};
+$('#cpyAll').onclick=()=>{
+  const list=[];
+  document.querySelectorAll('#body .pn').forEach(pn=>{if(pn.dataset.pn)list.push(pn.dataset.pn);});
+  const txt=[...new Set(list)].join('\n');
+  navigator.clipboard.writeText(txt).then(()=>toast.success('Disalin',{description:list.length+' PN tersalin'})).catch(()=>{});
+};
 document.addEventListener('data-changed',go);
 boot().then(()=>{
   const q=new URLSearchParams(location.search).get('q');
@@ -56,3 +78,34 @@ boot().then(()=>{
   go();
 });
 </script></body></html>
+
+<script>
+// search history
+const histKey='cmp-search-hist';
+function addHist(q){
+  if(!q)return;
+  try{
+    const h=JSON.parse(localStorage.getItem(histKey)||'[]').filter(x=>x!==q);
+    h.unshift(q);localStorage.setItem(histKey,JSON.stringify(h.slice(0,10)));
+  }catch(e){}
+}
+const origGo=go;
+go=async function(){
+  const q=$('#q').value.trim();
+  if(q)addHist(q);
+  return origGo.apply(this,arguments);
+};
+// simple dropdown
+$('#q').addEventListener('focus',()=>{
+  if(!$('#q').value.trim()) { const d=document.getElementById('qhist'); if(d) d.remove(); return; }
+  try{
+    const h=JSON.parse(localStorage.getItem(histKey)||'[]');
+    if(!h.length)return;
+    let d=document.getElementById('qhist');
+    if(!d){d=document.createElement('div');d.id='qhist';d.style.cssText='position:absolute;left:0;right:0;top:100%;margin-top:8px;background:var(--card);border:1px solid var(--bd);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.16);z-index:60;overflow:hidden;backdrop-filter:blur(8px)';$('#q').parentElement.style.position='relative';$('#q').parentElement.appendChild(d);}
+    d.innerHTML=h.map(x=>`<div style="padding:7px 12px;cursor:pointer;font-size:14px" data-q="${esc(x)}">${esc(x)}</div>`).join('');
+    d.querySelectorAll('div').forEach(el=>el.onclick=()=>{$('#q').value=el.dataset.q;d.remove();origGo();});
+  }catch(e){}
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.sb')){const d=document.getElementById('qhist');if(d)d.remove();}});
+</script>
