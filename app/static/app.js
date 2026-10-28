@@ -70,7 +70,7 @@ function rowCells(i,q,no){
   const apprName = isApproved ? i.approved_by_name : '';
   const chkCol = document.body.dataset.page==='list' ? `<td><input type="checkbox" class="chkRow" data-id="${i.id}"></td>` : '';
   const actCol = document.body.dataset.page==='list' ? `<td class="act-col" style="display:flex;gap:4px;flex-wrap:wrap">${approveBtn}${editBtn}</td>` : '';
-  const nmCell = document.body.dataset.page==='list' ? `${nm} ${isApproved?'<span class="ap-pill" title="'+esc(apBtnTip)+'">✓ Disetujui</span>':''}` : `${nm} ${isApproved?'<span class="ap-pill" title="'+esc(apBtnTip)+'">✓ Disetujui</span>':''}`;
+  const nmCell = nm;
   return chkCol+`<td class="nm">${no?`<span class="no">${no}</span>`:''}${nmCell}</td>`
     +COMPS.map(c=>`<td>${cell(m[c],q,apprName,i.approved_at)}</td>`).join('')
     +`<td class="author-col">${author}</td>`
