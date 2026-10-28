@@ -88,7 +88,7 @@ function renderNavAuth(){
   const el=$('#navAuth');
   if(!el)return;
   if(CURRENT_USER){
-    el.innerHTML=`<span class="user-pill" title="Login sebagai ${esc(CURRENT_USER.username)}">👤 <b>${esc(CURRENT_USER.username)}</b></span><button class="btn sm" id="bLogout">Keluar</button>`;
+    el.innerHTML='<span class="user-pill" title="Login sebagai '+esc(CURRENT_USER.username)+'">👤 <b>'+esc(CURRENT_USER.username)+'</b></span><md-text-button id="bLogout">Keluar</md-text-button>';
     const bLo=$('#bLogout');
     if(bLo)bLo.onclick=async()=>{
       await fetch('/api/auth/logout',{method:'POST'});
@@ -98,7 +98,7 @@ function renderNavAuth(){
       await changed();
     };
   }else{
-    el.innerHTML=`<button class="btn sm" id="bLogin">Masuk</button>`;
+    el.innerHTML='<md-text-button id="bLogin">Masuk</md-text-button>';
     const bLi=$('#bLogin');
     if(bLi)bLi.onclick=()=>openAuth();
   }
@@ -175,11 +175,20 @@ function chrome(){
   $('#nav').innerHTML='<a class="brand" href="/"><span class="logo">PN</span><span class="t">Compare PN</span></a>'+
     '<nav><a href="/" class="'+(pg==='search'?'on':'')+'">Cari</a><a href="/list" class="'+(pg==='list'?'on':'')+'">Daftar</a></nav>'+
     '<span class="sp"></span><span class="mu" id="stats"></span>'+
-    '<span id="navAuth" style="display:inline-flex;align-items:center;gap:6px"></span>'+
-    '<select id="thm" class="btn" style="padding:6px 10px">'+themes.map(([v,l])=>'<option value="'+v+'" '+(cur===v?'selected':'')+'>'+l+'</option>').join('')+'</select>'+
-    '<button class="btn" id="bImp">Import</button><button class="btn pri" id="bAdd">+ Tambah</button>';
+    '<span id="navAuth" style="display:inline-flex;align-items:center;gap:8px"></span>'+
+    '<md-outlined-select id="thm" style="min-width:130px">'+themes.map(([v,l])=>'<md-select-option value="'+v+'" '+(cur===v?'selected':'')+'><div slot="headline">'+l+'</div></md-select-option>').join('')+'</md-outlined-select>'+
+    '<md-outlined-button id="bImp">Import</md-outlined-button><md-filled-button id="bAdd">Tambah</md-filled-button>';
   renderNavAuth();
-  setTimeout(()=>{$('#thm')&&($('#thm').onchange=e=>applyTheme(e.target.value));},0);
+  setTimeout(()=>{
+    const th=$('#thm');
+    if(th){
+      th.value=cur;
+      th.addEventListener('change',e=>{
+        const v=e.target.value||'';
+        applyTheme(v);
+      });
+    }
+  },0);
   try{
     const navEl=$('#nav');
     if(navEl){
