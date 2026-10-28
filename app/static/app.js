@@ -823,6 +823,7 @@ function chrome(){
     '<span class="sp"></span><span class="mu" id="stats"></span>'+
     '<span id="navAuth" style="display:inline-flex;align-items:center;gap:8px"></span>'+
     '<select class="btn sm" id="thm" style="min-width:110px">'+themes.map(([v,l])=>'<option value="'+v+'" '+(cur===v?'selected':'')+'>'+l+'</option>').join('')+'</select>'+
+    '<button class="btn sm" id="bNeko" title="Toggle pet kucing Neko">Neko</button>'+
     '<button class="btn sm" id="bImp">Import</button><button class="btn sm pri" id="bAdd">+ Tambah</button>';
   renderNavAuth();
   const th=$('#thm');
@@ -833,6 +834,58 @@ function chrome(){
       applyTheme(v);
     });
   }
+
+  const NEKO_BEHAVIORS = {
+    'Chase Mouse': 'Mengejar Kursor',
+    'Run Away From Mouse': 'Menghindar dari Kursor',
+    'Run Around Randomly': 'Lari Acak',
+    'Pace Around Screen': 'Keliling Sudut Layar',
+    'Run Around': 'Bermain Bola Pantul'
+  };
+  window.onNekoBehaviorChange = function(name) {
+    const lbl = NEKO_BEHAVIORS[name] || name;
+    if (window.toast) toast.info(`Perilaku Neko: ${lbl}`);
+  };
+
+  const applyNekoState = (enabled, notify = false) => {
+    const btn = $('#bNeko');
+    if (btn) {
+      btn.classList.toggle('active', enabled);
+      btn.title = enabled ? 'Neko: Aktif (klik untuk matikan)' : 'Neko: Nonaktif (klik untuk aktifkan)';
+    }
+    if (enabled) {
+      if (!window.nekoInstance && typeof window.createNeko === 'function') {
+        window.nekoInstance = window.createNeko({
+          speed: 24,
+          fps: 120,
+          allowBehaviorChange: true
+        });
+      }
+    } else {
+      if (window.nekoInstance) {
+        window.nekoInstance.destroy();
+        window.nekoInstance = null;
+      }
+    }
+    if (notify) {
+      if (enabled) toast.success('Neko diaktifkan. Klik kucing untuk mengubah aksinya.');
+      else toast.info('Neko dimatikan.');
+    }
+  };
+
+  const bNeko = $('#bNeko');
+  if (bNeko) {
+    bNeko.onclick = () => {
+      let curNeko = true;
+      try { curNeko = localStorage.getItem('pn_neko_enabled') !== '0'; } catch(e){}
+      const nextNeko = !curNeko;
+      try { localStorage.setItem('pn_neko_enabled', nextNeko ? '1' : '0'); } catch(e){}
+      applyNekoState(nextNeko, true);
+    };
+  }
+  let nekoInit = true;
+  try { nekoInit = localStorage.getItem('pn_neko_enabled') !== '0'; } catch(e){}
+  applyNekoState(nekoInit, false);
 
   document.body.insertAdjacentHTML('beforeend',`
   <datalist id="cl"></datalist><div id="toasts" popover="manual"></div>
