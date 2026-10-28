@@ -1,3 +1,4 @@
-unico,matric
-001,07x
-002;002A;002B,08-Y
+nama barang,unico,matric
+Bearing Roda Depan,001;001A,07x
+Brake Pad Depan,002;002A;002B,08-Y
+Filter Oli,003,09-Z;09-ZA

@@ -8,21 +8,30 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
-<script type="importmap">
-{"imports":{"@material/web/":"https://esm.run/@material/web/"}}
-</script>
-<script type="module" src="https://esm.run/@material/web/all.js"></script>
 </head>
 <body data-page="list"><header id="nav"></header>
 <main>
+  <div class="print-banner">
+    <h2>Daftar Part Number &bull; Compare PN</h2>
+    <p>Dicetak pada: <script>document.write(new Date().toLocaleString('id-ID'))</script></p>
+  </div>
   <div class="bar">
     <div style="position:relative;flex:1;min-width:200px">
       <input class="f" id="q" autocomplete="off" placeholder="Filter PN atau nama barang (kosong = semua)" style="width:100%;padding-right:36px">
       <button class="qc" id="qc" hidden aria-label="Hapus filter" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">×</button>
     </div>
     <select id="apf"><option value="">Semua status</option><option value="0">Belum di-approve</option><option value="1">Sudah di-approve</option></select>
+    <select id="uf"><option value="">Semua pembuat</option><option value="me">Hanya data saya</option></select>
+    <select id="srt" title="Urutan Data">
+      <option value="name_asc" selected>Sort: Nama (A - Z)</option>
+      <option value="name_desc">Sort: Nama (Z - A)</option>
+      <option value="id_desc">Sort: Terbaru</option>
+      <option value="id_asc">Sort: Terlama</option>
+    </select>
     <select id="sz"><option value="25">25 / hal</option><option value="50" selected>50 / hal</option><option value="100">100 / hal</option></select>
+    <button class="btn sm" id="cpyAll">Salin Semua PN</button>
     <button class="btn sm" id="expList">Export CSV</button>
+    <button class="btn sm" id="bPrint" onclick="window.print()">Cetak</button>
     <button class="btn" id="dn">Rapat</button>
   </div>
 
@@ -49,16 +58,35 @@ function clearFilter(){
 }
 async function go(p){
   page=Math.max(1,p||1);
-  const size=$('#sz').value,q=$('#q').value.trim(),ap=$('#apf').value;
-  // remember filters
-  try{localStorage.setItem('cmp_list_sz',size);localStorage.setItem('cmp_list_ap',ap);}catch(e){}
-  const r=await jget(`/api/list?page=${page}&size=${size}&q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}`);
+  const size=$('#sz').value,q=$('#q').value.trim(),ap=$('#apf').value,uf=$('#uf')?.value||'',srt=$('#srt')?.value||'name_asc';
+  CURRENT_SORT = srt;
+  try{localStorage.setItem('cmp_list_sz',size);localStorage.setItem('cmp_list_ap',ap);localStorage.setItem('cmp_list_uf',uf);localStorage.setItem('cmp_list_srt',srt);}catch(e){}
+
+  // Skeleton shimmer placeholder
+  $('#head').innerHTML=typeof headHtml==='function'?headHtml():'';
+  $('#body').innerHTML=skeletonHtml((COMPS.length||4)+1, Math.min(parseInt(size,10)||10, 8));
+  $('#tw').hidden=false;
+  $('#empty').innerHTML='';
+
+  const r=await jget(`/api/list?page=${page}&size=${size}&q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}&user_filter=${encodeURIComponent(uf)}&sort=${encodeURIComponent(srt)}`);
   pages=Math.max(1,Math.ceil(r.total/r.size));
   if(page>pages)return go(pages);
-  history.replaceState(null,'',`?page=${page}&size=${size}`+(q?'&q='+encodeURIComponent(q):'')+(ap?'&approved='+encodeURIComponent(ap):''));
+  history.replaceState(null,'',`?page=${page}&size=${size}`+(q?'&q='+encodeURIComponent(q):'')+(ap?'&approved='+encodeURIComponent(ap):'')+(uf?'&user_filter='+encodeURIComponent(uf):'')+(srt&&srt!=='name_asc'?'&sort='+encodeURIComponent(srt):''));
 
   const pb=$('#pendBadge');
-  if(pb){if(r.pending){pb.style.display='inline-flex';pb.textContent=`Belum di-approve: ${fmt(r.pending)}`;}else pb.style.display='none';}
+  if(pb){
+    if(r.pending){
+      pb.style.display='inline-flex';
+      pb.textContent=`Belum di-approve: ${fmt(r.pending)}`;
+      pb.title = ap === '0' ? 'Klik untuk tampilkan semua status' : 'Klik untuk filter hanya yang belum di-approve';
+      pb.onclick = () => {
+        $('#apf').value = $('#apf').value === '0' ? '' : '0';
+        go(1);
+      };
+    } else {
+      pb.style.display='none';
+    }
+  }
 
   const hasItems=r.total>0;
   $('#tw').hidden=!hasItems;
@@ -83,12 +111,12 @@ async function go(p){
   $('.tw').scrollTop=0;
 }
 $('#pv').onclick=()=>go(page-1);$('#nx').onclick=()=>go(page+1);
-$('#pg').onchange=e=>go(+e.target.value);$('#sz').onchange=()=>go(1);$('#apf').onchange=()=>go(1);
-$('#qc').onclick=clearFilter;
-$('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearFilter();});
+$('#pg').onchange=e=>{ const val = Math.max(1, Math.min(pages, parseInt(e.target.value, 10) || 1)); e.target.value = val; go(val); };
+$('#sz').onchange=()=>go(1);$('#apf').onchange=()=>go(1);$('#srt').onchange=()=>go(1);
+const ufEl=$('#uf');if(ufEl)ufEl.onchange=()=>go(1);
 $('#expList').onclick=()=>{
-  const q=$('#q').value.trim(),ap=$('#apf').value;
-  fetch(`/api/list?page=1&size=10000&q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}`).then(r=>r.json()).then(j=>{
+  const q=$('#q').value.trim(),ap=$('#apf').value,uf=$('#uf')?.value||'';
+  fetch(`/api/list?page=1&size=10000&q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}&user_filter=${encodeURIComponent(uf)}`).then(r=>r.json()).then(j=>{
     const rows=[['Barang','Company','PN','Urutan','Diupdate Oleh','Status Approve','Disetujui Oleh','Tanggal Approve']];
     (j.items||[]).forEach(it=>{
       const nm=(it.name||'').replace(/\n/g,' ');
@@ -108,13 +136,25 @@ $('#expList').onclick=()=>{
     a.download='daftar-pn.csv';a.click();
   });
 };
+$('#cpyAll').onclick=()=>{
+  const list=[];
+  document.querySelectorAll('#body .pn').forEach(pn=>{if(pn.dataset.pn)list.push(pn.dataset.pn);});
+  const unique=[...new Set(list)];
+  if(!unique.length){toast.info('Tidak ada PN untuk disalin');return;}
+  copyText(unique.join('\n'), null, `${unique.length} PN disalin`);
+};
+$('#qc').onclick=clearFilter;
 $('#q').addEventListener('input',()=>{
   $('#qc').hidden=!$('#q').value;
   clearTimeout(t);
   t=setTimeout(()=>go(1),300);
 });
+$('#q').addEventListener('keydown',e=>{
+  if(e.key==='Escape')clearFilter();
+});
 document.addEventListener('keydown',e=>{
   if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)||document.querySelector('dialog[open]'))return;
+  if(e.key==='/'&&!e.ctrlKey&&!e.metaKey){e.preventDefault();$('#q').focus();$('#q').select();}
   if(e.key==='ArrowLeft'&&page>1)go(page-1);
   if(e.key==='ArrowRight'&&page<pages)go(page+1);
 });
@@ -135,6 +175,24 @@ boot().then(()=>{
   if(P.get('size'))$('#sz').value=P.get('size');
   try{if(!P.get('approved')&&localStorage.getItem('cmp_list_ap')!==null)$('#apf').value=localStorage.getItem('cmp_list_ap');}catch(e){}
   if(P.get('approved'))$('#apf').value=P.get('approved');
+  try{if(!P.get('user_filter')&&localStorage.getItem('cmp_list_uf'))$('#uf').value=localStorage.getItem('cmp_list_uf');}catch(e){}
+  if(P.get('user_filter'))$('#uf').value=P.get('user_filter');
+  try{if(!P.get('sort')&&localStorage.getItem('cmp_list_srt'))$('#srt').value=localStorage.getItem('cmp_list_srt');}catch(e){}
+  if(P.get('sort'))$('#srt').value=P.get('sort');
+  CURRENT_SORT=$('#srt')?.value||'name_asc';
+
+  jget('/api/users').then(users => {
+    const sel = $('#uf');
+    if(!sel || !Array.isArray(users)) return;
+    users.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = `User: ${u.username}`;
+      sel.appendChild(opt);
+    });
+    if(P.get('user_filter')) sel.value = P.get('user_filter');
+  }).catch(()=>{});
+
   go(+P.get('page')||1);
 });
 </script>
