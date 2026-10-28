@@ -15,13 +15,7 @@
     <button class="btn sm" id="expList">Export CSV</button>
     <button class="btn" id="dn">Rapat</button>
   </div>
-  <div class="bar" id="bulkBar" style="display:none;align-items:center;gap:8px">
-    <span class="mu"><span id="selCount">0</span> dipilih</span>
-    <span class="sp"></span>
-    <button class="btn sm" id="bulkApp">Approve terpilih</button>
-    <button class="btn sm" id="bulkUnapp">Batal approve terpilih</button>
-    <button class="btn sm" id="bulkClr">Batal pilih</button>
-  </div>
+
   <div class="bar" style="align-items:center"><span class="badge" id="pendBadge" style="display:none"></span></div>
   <div class="tw grow" id="tw"><table class="data"><thead id="head"></thead><tbody id="body"></tbody></table></div>
   <div id="empty"></div>
@@ -82,34 +76,6 @@ $('#pv').onclick=()=>go(page-1);$('#nx').onclick=()=>go(page+1);
 $('#pg').onchange=e=>go(+e.target.value);$('#sz').onchange=()=>go(1);$('#apf').onchange=()=>go(1);
 $('#qc').onclick=clearFilter;
 $('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearFilter();});
-
-function updateBulk(){
-  const sel=[...document.querySelectorAll('.chkRow:checked')];
-  const bar=$('#bulkBar'),cnt=$('#selCount');
-  if(!bar||!cnt)return;
-  if(sel.length){bar.style.display='flex';cnt.textContent=sel.length;}else{bar.style.display='none';}
-}
-document.addEventListener('change',e=>{
-  if(e.target.id==='chkAll'){
-    document.querySelectorAll('.chkRow').forEach(c=>{c.checked=e.target.checked;});
-    updateBulk();return;
-  }
-  if(e.target.classList.contains('chkRow')){updateBulk();return;}
-});
-$('#bulkClr').onclick=()=>{document.querySelectorAll('.chkRow,#chkAll').forEach(c=>{c.checked=false;});updateBulk();};
-async function bulkAct(appr){
-  const sel=[...document.querySelectorAll('.chkRow:checked')].map(c=>+c.dataset.id);
-  if(!sel.length)return;
-  if(!confirm(appr?'Approve '+sel.length+' item terpilih?':'Batal approve '+sel.length+' item terpilih?'))return;
-  const r=await fetch('/api/items/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approve:appr,ids:sel})}).then(x=>x.json());
-  if(r.error){toast.error(r.error);return;}
-  toast.success(appr?'Diapprove':'Approval dibatalkan',{description:sel.length+' item'});
-  document.querySelectorAll('.chkRow,#chkAll').forEach(c=>{c.checked=false;});
-  updateBulk();
-  go(page);
-}
-$('#bulkApp').onclick=()=>bulkAct(true);
-$('#bulkUnapp').onclick=()=>bulkAct(false);
 $('#expList').onclick=()=>{
   const q=$('#q').value.trim(),ap=$('#apf').value;
   fetch(`/api/list?page=1&size=10000&q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}`).then(r=>r.json()).then(j=>{

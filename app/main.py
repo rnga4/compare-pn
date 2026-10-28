@@ -460,28 +460,6 @@ def update_item(item_id: int, body: NewItem, request: Request):
 
 class ApproveBody(BaseModel):
     approve: bool = True
-    ids: list[int] | None = None
-
-@app.post("/api/items/approve")
-def approve_items(body: ApproveBody, request: Request):
-    user = get_current_user(request)
-    if not user:
-        return {"error": "Silakan login terlebih dahulu"}
-    ids = body.ids or []
-    if not ids:
-        return {"error": "Pilih minimal 1 item"}
-    ids = [int(x) for x in ids]
-    with conn() as c, c.transaction():
-        for item_id in ids:
-            item = c.execute("SELECT id FROM items WHERE id = %s FOR UPDATE", (item_id,)).fetchone()
-            if not item:
-                continue
-            if body.approve:
-                c.execute("UPDATE items SET approved_by = %s, approved_at = now() WHERE id = %s", (user["id"], item_id))
-            else:
-                c.execute("UPDATE items SET approved_by = NULL, approved_at = NULL WHERE id = %s", (item_id,))
-    invalidate_cache()
-    return {"ok": True, "count": len(ids)}
 
 @app.post("/api/items/{item_id}/approve")
 def approve_item(item_id: int, body: ApproveBody, request: Request):
