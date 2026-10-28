@@ -23,6 +23,8 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;width:100%;
 .btn:hover{background:var(--hd)}.btn:disabled{opacity:.5;cursor:default}
 .btn.sm{padding:5px 12px;font-size:14px}
 .btn.sm.ok{border-color:rgba(34,197,94,.8);color:#22c55e;background:linear-gradient(180deg,rgba(34,197,94,.12),rgba(34,197,94,.06))}
+.ap-pill{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:1px 6px;border-radius:999px;border:1px solid rgba(34,197,94,.6);color:#22c55e;font-size:11px;font-weight:600;background:rgba(34,197,94,.08)}
+.badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;border:1px solid var(--bd);background:var(--hd);font-size:12px}
 .btn.pri{background:var(--ac);border-color:var(--ac);color:#fff}.btn.pri:hover{opacity:.9}
 input,select{font:inherit;font-size:15px;line-height:1.5;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:9px;padding:10px 12px}
 input:focus,select:focus{outline:2px solid var(--ac);outline-offset:2px}

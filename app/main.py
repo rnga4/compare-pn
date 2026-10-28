@@ -460,6 +460,28 @@ def update_item(item_id: int, body: NewItem, request: Request):
 
 class ApproveBody(BaseModel):
     approve: bool = True
+    ids: list[int] | None = None
+
+@app.post("/api/items/approve")
+def approve_items(body: ApproveBody, request: Request):
+    user = get_current_user(request)
+    if not user:
+        return {"error": "Silakan login terlebih dahulu"}
+    ids = body.ids or []
+    if not ids:
+        return {"error": "Pilih minimal 1 item"}
+    ids = [int(x) for x in ids]
+    with conn() as c, c.transaction():
+        for item_id in ids:
+            item = c.execute("SELECT id FROM items WHERE id = %s FOR UPDATE", (item_id,)).fetchone()
+            if not item:
+                continue
+            if body.approve:
+                c.execute("UPDATE items SET approved_by = %s, approved_at = now() WHERE id = %s", (user["id"], item_id))
+            else:
+                c.execute("UPDATE items SET approved_by = NULL, approved_at = NULL WHERE id = %s", (item_id,))
+    invalidate_cache()
+    return {"ok": True, "count": len(ids)}
 
 @app.post("/api/items/{item_id}/approve")
 def approve_item(item_id: int, body: ApproveBody, request: Request):
@@ -486,6 +508,7 @@ def api_list(page: int = 1, size: int = 50, q: str = "", approved: str = ""):
     approved = (approved or "").strip()
     offset = (page - 1) * size
     with conn() as c:
+        pending = c.execute("SELECT count(*) AS n FROM items WHERE approved_by IS NULL").fetchone()["n"]
         if not q:
             base = "FROM items i"
             where = ""
@@ -546,4 +569,4 @@ def api_list(page: int = 1, size: int = 50, q: str = "", approved: str = ""):
                 JOIN companies co ON co.id = p.company_id
                 GROUP BY pg.id, pg.name, pg.user_id, u.username, ub.username, ua.username, pg.approved_at ORDER BY pg.id
             """, params).fetchall()
-    return {"total": total, "page": page, "size": size, "items": rows}
+    return {"total": total, "page": page, "size": size, "items": rows, "pending": pending}

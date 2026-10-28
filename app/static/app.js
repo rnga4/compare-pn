@@ -45,7 +45,9 @@ function cell(list,q,approved,approvedAt){
       :`<span class="pnwrap"><button type="button" class="pn rep${hit}" data-pn="${esc(p.pn)}" title="Pengganti ${p.seq} · klik untuk salin" aria-label="Salin PN pengganti ${esc(p.pn)}">↳ ${esc(p.pn)}</button>${chk}</span>`;
   }).join('');
 }
-const headHtml=()=>'<tr><th>Barang</th>'+COMPS.map(c=>`<th>${esc(c)}</th>`).join('')+'<th class="author-th">Diupdate Oleh</th><th class="act-th">Aksi</th></tr>';
+const headHtml=()=> (document.body.dataset.page==='list'
+  ? '<tr><th style="width:40px"><input type="checkbox" id="chkAll" aria-label="Pilih semua"></th><th>Barang</th>'+COMPS.map(c=>`<th>${esc(c)}</th>`).join('')+'<th class="author-th">Diupdate Oleh</th><th class="act-th">Aksi</th></tr>'
+  : '<tr><th>Barang</th>'+COMPS.map(c=>`<th>${esc(c)}</th>`).join('')+'<th class="author-th">Diupdate Oleh</th></tr>');
 function rowCells(i,q,no){
   const m={};i.pns.forEach(p=>(m[p.company]=m[p.company]||[]).push(p));
   const nm=i.name?esc(i.name):'<span class="mu">(tanpa nama)</span>';
@@ -66,10 +68,13 @@ function rowCells(i,q,no){
   const approveBtn = CURRENT_USER ? `<button class="btn sm ${isApproved?'ok':''}" data-approve="${i.id}" data-appr="${isApproved?'0':'1'}" title="${esc(apBtnTip)}">${isApproved?'✓ Disetujui':'✓ Approve'}</button>` : '';
   const editBtn = (canEdit && !isApproved) ? `<button class="btn sm" data-edit="${i.id}" title="Edit">Edit</button>` : (canEdit && isApproved ? `<button class="btn sm" disabled title="Batalin approve dulu kalo mau edit">Edit</button>` : '');
   const apprName = isApproved ? i.approved_by_name : '';
-  return `<td class="nm">${no?`<span class="no">${no}</span>`:''}${nm}</td>`
+  const chkCol = document.body.dataset.page==='list' ? `<td><input type="checkbox" class="chkRow" data-id="${i.id}"></td>` : '';
+  const actCol = document.body.dataset.page==='list' ? `<td class="act-col" style="display:flex;gap:4px;flex-wrap:wrap">${approveBtn}${editBtn}</td>` : '';
+  const nmCell = document.body.dataset.page==='list' ? `${nm} ${isApproved?'<span class="ap-pill" title="'+esc(apBtnTip)+'">✓ Disetujui</span>':''}` : `${nm} ${isApproved?'<span class="ap-pill" title="'+esc(apBtnTip)+'">✓ Disetujui</span>':''}`;
+  return chkCol+`<td class="nm">${no?`<span class="no">${no}</span>`:''}${nmCell}</td>`
     +COMPS.map(c=>`<td>${cell(m[c],q,apprName,i.approved_at)}</td>`).join('')
     +`<td class="author-col">${author}</td>`
-    +`<td class="act-col" style="display:flex;gap:4px;flex-wrap:wrap">${approveBtn}${editBtn}</td>`;
+    +actCol;
 }
 
 async function loadAuth(){
