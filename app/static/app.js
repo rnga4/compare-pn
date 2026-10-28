@@ -416,7 +416,17 @@ function chrome(){
       ($('#aRows .p')||$('#aNm')).focus();
     }else $('#dAdd').close();
   };
-  $('#bAdd').onclick=openAdd;$('#aX').onclick=()=>$('#dAdd').close();
+  setTimeout(()=>{
+    const ba=$('#bAdd'); if(ba){ba.onclick=openAdd;}
+    const bi=$('#bImp'); if(bi){bi.onclick=()=>{
+      if(!CURRENT_USER){
+        openAuth('Silakan masuk atau daftar terlebih dahulu untuk import file PN.');
+        return;
+      }
+      $('#iMsg').textContent='';$('#iRes').innerHTML='';$('#iFile').value='';setFile();$('#dImp').showModal();
+    };}
+  },0);
+  $('#aX').onclick=()=>$('#dAdd').close();
   $('#aSave').onclick=()=>save(false);$('#aSave2').onclick=()=>save(true);
   $('#aMore').onclick=()=>{addRow('',false);$$('#aRows .c').pop().focus()};
   $('#aRows').addEventListener('click',e=>{if(e.target.classList.contains('x'))e.target.closest('.r').remove()});
@@ -431,13 +441,6 @@ function chrome(){
 
   // --- import
   const setFile=()=>{const f=$('#iFile').files[0];$('#iName').textContent=f?f.name:'.csv atau .xlsx'};
-  $('#bImp').onclick=()=>{
-    if(!CURRENT_USER){
-      openAuth('Silakan masuk atau daftar terlebih dahulu untuk import file PN.');
-      return;
-    }
-    $('#iMsg').textContent='';$('#iRes').innerHTML='';$('#iFile').value='';setFile();$('#dImp').showModal();
-  };
   $('#iX').onclick=$('#iClose').onclick=()=>$('#dImp').close();
   $('#iFile').onchange=setFile;
   const dz=$('#iDrop');
