@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="id"><head><meta charset="utf-8"><title>Compare PN</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233b82f6'/%3E%3Ctext x='50%25' y='54%25' font-family='Inter,Arial,sans-serif' font-size='28' font-weight='700' fill='white' text-anchor='middle'%3EPN%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css"></head>
 <body data-page="search"><header id="nav"></header>
 <main>
@@ -49,7 +50,7 @@ $('#q').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(go,250)});
 $('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearQ()});
 $('#qc').onclick=clearQ;
 $('#expCsv').onclick=()=>{
-  const rows=[['Barang','Company','PN','Urutan','Diinput Oleh']];
+  const rows=[['Barang','Company','PN','Urutan','Diupdate Oleh']];
   const ths=Array.from(document.querySelectorAll('#head th'));
   document.querySelectorAll('#body tr').forEach(tr=>{
     const nm=tr.querySelector('.nm')?.textContent.replace(/^\d+\s*/,'').trim()||'';

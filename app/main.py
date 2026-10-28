@@ -64,7 +64,12 @@ CREATE INDEX IF NOT EXISTS sessions_token ON sessions(token);
 CREATE INDEX IF NOT EXISTS sessions_expires ON sessions(expires_at);
 
 ALTER TABLE items ADD COLUMN IF NOT EXISTS user_id int REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS updated_by int REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS approved_by int REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS approved_at timestamptz;
 CREATE INDEX IF NOT EXISTS items_user_id ON items(user_id);
+CREATE INDEX IF NOT EXISTS items_updated_by ON items(updated_by);
+CREATE INDEX IF NOT EXISTS items_approved_by ON items(approved_by);
 """
 
 @contextmanager
@@ -235,15 +240,17 @@ def search(q: str = Query(..., min_length=1), limit: int = 50):
               UNION
               SELECT id FROM items WHERE name ILIKE '%%' || %(q)s || '%%'
               LIMIT %(lim)s)
-            SELECT i.id, i.name, u.username AS created_by,
+            SELECT i.id, i.name, i.user_id, u.username AS created_by, ub.username AS updated_by, ua.username AS approved_by_name, i.approved_at,
                    json_agg(json_build_object('company', c.name, 'pn', p.pn, 'seq', p.seq)
                             ORDER BY c.id, p.seq) AS pns
             FROM hit h
             JOIN items i ON i.id = h.item_id
             LEFT JOIN users u ON u.id = i.user_id
+            LEFT JOIN users ub ON ub.id = i.updated_by
+            LEFT JOIN users ua ON ua.id = i.approved_by
             JOIN part_numbers p ON p.item_id = i.id
             JOIN companies c ON c.id = p.company_id
-            GROUP BY i.id, i.name, u.username ORDER BY i.name
+            GROUP BY i.id, i.name, i.user_id, u.username, ub.username, ua.username, i.approved_at ORDER BY i.name
         """, {"qn": qn, "q": q, "lim": min(limit, 500)}).fetchall()
     return rows
 
@@ -378,54 +385,165 @@ def list_page():
     with open(os.path.join(os.path.dirname(__file__), "list.html"), encoding="utf-8") as f:
         return f.read()
 
+@app.get("/api/items/{item_id}")
+def get_item_detail(item_id: int, request: Request):
+    user = get_current_user(request)
+    if not user:
+        return {"error": "Silakan login terlebih dahulu untuk mengedit data"}
+    with conn() as c:
+        item = c.execute("SELECT id, name, user_id FROM items WHERE id = %s", (item_id,)).fetchone()
+        if not item:
+            return {"error": "Data tidak ditemukan"}
+        if item["user_id"] is not None and item["user_id"] != user["id"]:
+            return {"error": "Tidak diizinkan mengedit data ini"}
+        rows = c.execute("""
+            SELECT co.name AS company, string_agg(p.pn, ';' ORDER BY p.seq) AS pns
+            FROM part_numbers p
+            JOIN companies co ON co.id = p.company_id
+            WHERE p.item_id = %s
+            GROUP BY co.id, co.name
+            ORDER BY co.id
+        """, (item_id,)).fetchall()
+    entries = [{"company": r["company"], "pns": r["pns"] or ""} for r in rows]
+    return {"id": item["id"], "name": item["name"] or "", "entries": entries}
+
+@app.put("/api/items/{item_id}")
+def update_item(item_id: int, body: NewItem, request: Request):
+    user = get_current_user(request)
+    if not user:
+        return {"error": "Silakan login terlebih dahulu untuk mengedit data"}
+    entries = []
+    for e in body.entries:
+        comp = (e.company or "").strip()
+        pns = split_pns(e.pns)
+        if comp and pns:
+            entries.append((comp, pns))
+    if not entries:
+        return {"error": "Isi minimal 1 company dengan 1 PN"}
+    with conn() as c, c.transaction():
+        item = c.execute("SELECT id, user_id, name FROM items WHERE id = %s FOR UPDATE", (item_id,)).fetchone()
+        if not item:
+            return {"error": "Data tidak ditemukan"}
+        if item["user_id"] is not None and item["user_id"] != user["id"]:
+            return {"error": "Tidak diizinkan mengedit data ini"}
+        # check conflicts with other items
+        for comp, pns in entries:
+            for pn in pns:
+                r = c.execute("""
+                    SELECT i.id, i.name, p.pn FROM part_numbers p
+                    JOIN companies co ON co.id = p.company_id
+                    JOIN items i ON i.id = p.item_id
+                    WHERE co.name = %s AND p.pn_norm = %s AND p.item_id <> %s
+                """, (comp, norm(pn), item_id)).fetchone()
+                if r:
+                    return {"error": f"PN {pn} sudah ada di {comp} (barang: {r['name'] or 'tanpa nama'}, PN {r['pn']})"}
+        # update name + updated_by, reset approval on edit
+        new_name = (body.name or "").strip() or None
+        c.execute("UPDATE items SET name = %s, updated_by = %s, approved_by = NULL, approved_at = NULL WHERE id = %s",
+                  (new_name, user["id"], item_id))
+        # replace part numbers
+        c.execute("DELETE FROM part_numbers WHERE item_id = %s", (item_id,))
+        added = 0
+        for comp, pns in entries:
+            cid = c.execute("""
+                INSERT INTO companies(name) VALUES (%s)
+                ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id
+            """, (comp,)).fetchone()["id"]
+            for seq, pn in enumerate(pns):
+                c.execute("""
+                    INSERT INTO part_numbers(item_id, company_id, pn, pn_norm, seq)
+                    VALUES (%s,%s,%s,%s,%s)
+                """, (item_id, cid, pn, norm(pn), seq))
+                added += 1
+    invalidate_cache()
+    return {"ok": True, "pn_added": added}
+
+class ApproveBody(BaseModel):
+    approve: bool = True
+
+@app.post("/api/items/{item_id}/approve")
+def approve_item(item_id: int, body: ApproveBody, request: Request):
+    user = get_current_user(request)
+    if not user:
+        return {"error": "Silakan login terlebih dahulu"}
+    with conn() as c, c.transaction():
+        item = c.execute("SELECT id FROM items WHERE id = %s FOR UPDATE", (item_id,)).fetchone()
+        if not item:
+            return {"error": "Data tidak ditemukan"}
+        if body.approve:
+            c.execute("UPDATE items SET approved_by = %s, approved_at = now() WHERE id = %s", (user["id"], item_id))
+            return {"ok": True, "approved": True}
+        else:
+            c.execute("UPDATE items SET approved_by = NULL, approved_at = NULL WHERE id = %s", (item_id,))
+            return {"ok": True, "approved": False}
+    invalidate_cache()
+
 @app.get("/api/list")
-def api_list(page: int = 1, size: int = 50, q: str = ""):
+def api_list(page: int = 1, size: int = 50, q: str = "", approved: str = ""):
     size = max(1, min(size, 200))
     page = max(1, page)
     q = (q or "").strip()
+    approved = (approved or "").strip()
     offset = (page - 1) * size
     with conn() as c:
         if not q:
-            total = c.execute("SELECT count(*) AS n FROM items").fetchone()["n"]
-            rows = c.execute("""
+            base = "FROM items i"
+            where = ""
+            params = {"size": size, "off": offset}
+            if approved == "1":
+                where = "WHERE i.approved_by IS NOT NULL"
+            elif approved == "0":
+                where = "WHERE i.approved_by IS NULL"
+            total = c.execute(f"SELECT count(*) AS n {base} {where}", params).fetchone()["n"]
+            rows = c.execute(f"""
                 WITH pg AS (
-                  SELECT i.id, i.name, i.user_id FROM items i
+                  SELECT i.id, i.name, i.user_id, i.updated_by, i.approved_by, i.approved_at FROM items i
+                  {where}
                   ORDER BY i.id LIMIT %(size)s OFFSET %(off)s)
-                SELECT pg.id, pg.name, u.username AS created_by,
+                SELECT pg.id, pg.name, pg.user_id, u.username AS created_by, ub.username AS updated_by, ua.username AS approved_by_name, pg.approved_at,
                        json_agg(json_build_object('company', co.name, 'pn', p.pn, 'seq', p.seq)
                                 ORDER BY co.id, p.seq) AS pns
                 FROM pg
                 LEFT JOIN users u ON u.id = pg.user_id
+                LEFT JOIN users ub ON ub.id = pg.updated_by
+                LEFT JOIN users ua ON ua.id = pg.approved_by
                 JOIN part_numbers p ON p.item_id = pg.id
                 JOIN companies co ON co.id = p.company_id
-                GROUP BY pg.id, pg.name, u.username ORDER BY pg.id
-            """, {"size": size, "off": offset}).fetchall()
+                GROUP BY pg.id, pg.name, pg.user_id, u.username, ub.username, ua.username, pg.approved_at ORDER BY pg.id
+            """, params).fetchall()
         else:
             qn = norm(q)
             params = {"qn": qn, "q": q, "size": size, "off": offset}
-            total = c.execute("""
+            filt = ""
+            if approved == "1":
+                filt = "AND i.approved_by IS NOT NULL"
+            elif approved == "0":
+                filt = "AND i.approved_by IS NULL"
+            total = c.execute(f"""
                 WITH hit AS (
-                  SELECT item_id AS id FROM part_numbers WHERE %(qn)s <> '' AND pn_norm LIKE '%%' || %(qn)s || '%%'
+                  SELECT item_id AS id FROM part_numbers p JOIN items i ON i.id = p.item_id WHERE %(qn)s <> '' AND p.pn_norm LIKE '%%' || %(qn)s || '%%' {filt}
                   UNION
-                  SELECT id FROM items WHERE name ILIKE '%%' || %(q)s || '%%')
+                  SELECT id FROM items i WHERE i.name ILIKE '%%' || %(q)s || '%%' {filt})
                 SELECT count(*) AS n FROM hit
             """, params).fetchone()["n"]
-            rows = c.execute("""
+            rows = c.execute(f"""
                 WITH hit AS (
-                  SELECT item_id AS id FROM part_numbers WHERE %(qn)s <> '' AND pn_norm LIKE '%%' || %(qn)s || '%%'
+                  SELECT item_id AS id FROM part_numbers p JOIN items i ON i.id = p.item_id WHERE %(qn)s <> '' AND p.pn_norm LIKE '%%' || %(qn)s || '%%' {filt}
                   UNION
-                  SELECT id FROM items WHERE name ILIKE '%%' || %(q)s || '%%'),
+                  SELECT id FROM items i WHERE i.name ILIKE '%%' || %(q)s || '%%' {filt}),
                 pg AS (
-                  SELECT i.id, i.name, i.user_id FROM hit h
+                  SELECT i.id, i.name, i.user_id, i.updated_by, i.approved_by, i.approved_at FROM hit h
                   JOIN items i ON i.id = h.id
                   ORDER BY i.id LIMIT %(size)s OFFSET %(off)s)
-                SELECT pg.id, pg.name, u.username AS created_by,
+                SELECT pg.id, pg.name, pg.user_id, u.username AS created_by, ub.username AS updated_by, ua.username AS approved_by_name, pg.approved_at,
                        json_agg(json_build_object('company', co.name, 'pn', p.pn, 'seq', p.seq)
                                 ORDER BY co.id, p.seq) AS pns
                 FROM pg
                 LEFT JOIN users u ON u.id = pg.user_id
+                LEFT JOIN users ub ON ub.id = pg.updated_by
+                LEFT JOIN users ua ON ua.id = pg.approved_by
                 JOIN part_numbers p ON p.item_id = pg.id
                 JOIN companies co ON co.id = p.company_id
-                GROUP BY pg.id, pg.name, u.username ORDER BY pg.id
+                GROUP BY pg.id, pg.name, pg.user_id, u.username, ub.username, ua.username, pg.approved_at ORDER BY pg.id
             """, params).fetchall()
     return {"total": total, "page": page, "size": size, "items": rows}

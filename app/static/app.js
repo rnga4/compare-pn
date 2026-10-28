@@ -24,26 +24,52 @@ function copyText(t){
 }
 document.addEventListener('click',e=>{const p=e.target.closest('.pn');if(p)copyText(p.dataset.pn)});
 
-function cell(list,q){
+function cell(list,q,approved,approvedAt){
   if(!list||!list.length)return '<span class="mu">–</span>';
   const qn=norm(q);
+  let apTip='';
+  if(approved){
+    if(approvedAt){
+      try{
+        const d=new Date(approvedAt);
+        if(!isNaN(d.getTime())) apTip = `Disetujui oleh ${approved} • ${d.toLocaleString('id-ID')}`;
+      }catch(e){}
+    }
+    if(!apTip) apTip = `Disetujui oleh ${approved}`;
+  }
   return list.map(p=>{
     const hit=qn&&norm(p.pn).includes(qn)?' hit':'';
+    const chk = approved ? `<span class="ap-chk" title="${esc(apTip)}">✓</span>` : '';
     return p.seq===0
-      ?`<button type="button" class="pn main${hit}" data-pn="${esc(p.pn)}" title="Klik untuk salin" aria-label="Salin PN ${esc(p.pn)}">${esc(p.pn)}</button>`
-      :`<button type="button" class="pn rep${hit}" data-pn="${esc(p.pn)}" title="Pengganti ${p.seq} · klik untuk salin" aria-label="Salin PN pengganti ${esc(p.pn)}">↳ ${esc(p.pn)}</button>`;
+      ?`<span class="pnwrap"><button type="button" class="pn main${hit}" data-pn="${esc(p.pn)}" title="Klik untuk salin" aria-label="Salin PN ${esc(p.pn)}">${esc(p.pn)}</button>${chk}</span>`
+      :`<span class="pnwrap"><button type="button" class="pn rep${hit}" data-pn="${esc(p.pn)}" title="Pengganti ${p.seq} · klik untuk salin" aria-label="Salin PN pengganti ${esc(p.pn)}">↳ ${esc(p.pn)}</button>${chk}</span>`;
   }).join('');
 }
-const headHtml=()=>'<tr><th>Barang</th>'+COMPS.map(c=>`<th>${esc(c)}</th>`).join('')+'<th class="author-th">Diinput Oleh</th></tr>';
+const headHtml=()=>'<tr><th>Barang</th>'+COMPS.map(c=>`<th>${esc(c)}</th>`).join('')+'<th class="author-th">Diupdate Oleh</th><th class="act-th">Aksi</th></tr>';
 function rowCells(i,q,no){
   const m={};i.pns.forEach(p=>(m[p.company]=m[p.company]||[]).push(p));
   const nm=i.name?esc(i.name):'<span class="mu">(tanpa nama)</span>';
-  const author=i.created_by
-    ?`<span class="badge-user" title="Diinput oleh ${esc(i.created_by)}">👤 ${esc(i.created_by)}</span>`
+  const who = i.updated_by || i.created_by;
+  const author = who
+    ?`<span class="badge-user" title="Diupdate oleh ${esc(who)}">👤 ${esc(who)}</span>`
     :'<span class="mu">–</span>';
+  const canEdit = CURRENT_USER && ((i.user_id == null) || (i.user_id == CURRENT_USER.id));
+  const isApproved = !!i.approved_by_name;
+  let apBtnTip = 'Kroscek & Approve';
+  if(isApproved){
+    try{
+      const d=new Date(i.approved_at);
+      if(!isNaN(d.getTime())) apBtnTip = `Disetujui oleh ${i.approved_by_name} • ${d.toLocaleString('id-ID')}`;
+      else apBtnTip = `Disetujui oleh ${i.approved_by_name}`;
+    }catch(e){ apBtnTip = `Disetujui oleh ${i.approved_by_name}`; }
+  }
+  const approveBtn = CURRENT_USER ? `<button class="btn sm ${isApproved?'ok':''}" data-approve="${i.id}" data-appr="${isApproved?'0':'1'}" title="${esc(apBtnTip)}">${isApproved?'✓ Disetujui':'✓ Approve'}</button>` : '';
+  const editBtn = (canEdit && !isApproved) ? `<button class="btn sm" data-edit="${i.id}" title="Edit">Edit</button>` : (canEdit && isApproved ? `<button class="btn sm" disabled title="Batalin approve dulu kalo mau edit">Edit</button>` : '');
+  const apprName = isApproved ? i.approved_by_name : '';
   return `<td class="nm">${no?`<span class="no">${no}</span>`:''}${nm}</td>`
-    +COMPS.map(c=>`<td>${cell(m[c],q)}</td>`).join('')
-    +`<td class="author-col">${author}</td>`;
+    +COMPS.map(c=>`<td>${cell(m[c],q,apprName,i.approved_at)}</td>`).join('')
+    +`<td class="author-col">${author}</td>`
+    +`<td class="act-col" style="display:flex;gap:4px;flex-wrap:wrap">${approveBtn}${editBtn}</td>`;
 }
 
 async function loadAuth(){
@@ -79,13 +105,12 @@ function renderNavAuth(){
 let authMode='login';
 function setAuthMode(mode){
   authMode=mode;
-  const tl=$('#tabLogin'),tr=$('#tabRegister'),sub=$('#authSubmit'),sw=$('#authSwitch'),msg=$('#authMsg');
-  if(tl)tl.classList.toggle('on',mode==='login');
-  if(tr)tr.classList.toggle('on',mode==='register');
+  const title=$('#authTitle'),sub=$('#authSubmit'),sw=$('#authSwitch'),msg=$('#authMsg');
+  if(title)title.textContent=mode==='login'?'Masuk':'Daftar Akun';
   if(sub)sub.textContent=mode==='login'?'Masuk':'Daftar & Masuk';
   if(sw)sw.innerHTML=mode==='login'
-    ?'Belum punya akun? <a id="authSwitchLink">Daftar akun baru di sini</a>'
-    :'Sudah punya akun? <a id="authSwitchLink">Masuk di sini</a>';
+    ?'Belum punya akun? <a id="authSwitchLink">Daftar akun baru</a>'
+    :'Sudah punya akun? <a id="authSwitchLink">Masuk</a>';
   const link=$('#authSwitchLink');
   if(link)link.onclick=()=>setAuthMode(mode==='login'?'register':'login');
   if(msg){msg.textContent='';msg.className='msg';}
@@ -145,12 +170,12 @@ function chrome(){
   let cur='';try{cur=localStorage.getItem('cmp-theme')||'';}catch(e){}
   applyTheme(cur);
   const themes=[['','Light'],['dark','Dark'],['theme-sakura','Sakura'],['theme-bamboo','Bamboo'],['theme-cyberpunk','Cyberpunk'],['theme-mingyu','Mingyu'],['theme-ocean','Ocean'],['theme-retrolight','Retrolight']];
-  $('#nav').innerHTML=`<a class="brand" href="/"><span class="logo">PN</span><span class="t">Compare PN</span></a>
-    <nav><a href="/" class="${pg==='search'?'on':''}">Cari</a><a href="/list" class="${pg==='list'?'on':''}">Daftar</a></nav>
-    <span class="sp"></span><span class="mu" id="stats"></span>
-    <span id="navAuth" style="display:inline-flex;align-items:center;gap:6px"></span>
-    <select id="thm" class="btn" style="padding:6px 10px">${themes.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('')}</select>
-    <button class="btn" id="bImp">Import</button><button class="btn pri" id="bAdd">+ Tambah</button>`;
+  $('#nav').innerHTML='<a class="brand" href="/"><span class="logo">PN</span><span class="t">Compare PN</span></a>'+
+    '<nav><a href="/" class="'+(pg==='search'?'on':'')+'">Cari</a><a href="/list" class="'+(pg==='list'?'on':'')+'">Daftar</a></nav>'+
+    '<span class="sp"></span><span class="mu" id="stats"></span>'+
+    '<span id="navAuth" style="display:inline-flex;align-items:center;gap:6px"></span>'+
+    '<select id="thm" class="btn" style="padding:6px 10px">'+themes.map(([v,l])=>'<option value="'+v+'" '+(cur===v?'selected':'')+'>'+l+'</option>').join('')+'</select>'+
+    '<button class="btn" id="bImp">Import</button><button class="btn pri" id="bAdd">+ Tambah</button>';
   renderNavAuth();
   setTimeout(()=>{$('#thm')&&($('#thm').onchange=e=>applyTheme(e.target.value));},0);
   try{
@@ -172,11 +197,7 @@ function chrome(){
   document.body.insertAdjacentHTML('beforeend',`
   <datalist id="cl"></datalist><div id="toasts" popover="manual"></div>
   <dialog id="dAuth">
-    <div class="dh"><h3>Akun Pengguna</h3><button class="x" id="authX" aria-label="Tutup">×</button></div>
-    <div class="auth-tabs">
-      <button class="auth-tab on" id="tabLogin" type="button">Masuk</button>
-      <button class="auth-tab" id="tabRegister" type="button">Daftar Akun Baru</button>
-    </div>
+    <div class="dh"><h3 id="authTitle">Masuk</h3><button class="x" id="authX" aria-label="Tutup">×</button></div>
     <div class="lb">Username</div>
     <input id="authU" autocomplete="username" placeholder="Masukkan username">
     <div class="lb">Password</div>
@@ -186,7 +207,7 @@ function chrome(){
       <button class="btn" id="authCancel" type="button">Batal</button>
       <button class="btn pri" id="authSubmit" type="button">Masuk</button>
     </div>
-    <div class="auth-switch" id="authSwitch">Belum punya akun? <a id="authSwitchLink">Daftar akun baru di sini</a></div>
+    <div class="auth-switch" id="authSwitch">Belum punya akun? <a id="authSwitchLink">Daftar akun baru</a></div>
   </dialog>
   <dialog id="dAdd">
     <div class="dh"><h3>Tambah barang</h3><button class="x" id="aX" aria-label="Tutup">×</button></div>
@@ -197,6 +218,16 @@ function chrome(){
     <div class="hint">Pengganti: pisah pakai <code>;</code>, contoh <code>002;002A;002B</code> (pertama = utama). Kosongkan company yang tidak punya PN.</div>
     <div id="aMsg" class="msg"></div>
     <div class="act"><button class="btn" id="aSave">Simpan</button><button class="btn pri" id="aSave2">Simpan &amp; lanjut</button></div>
+  </dialog>
+  <dialog id="dEdit">
+    <div class="dh"><h3>Edit barang</h3><button class="x" id="eX" aria-label="Tutup">×</button></div>
+    <div class="lb">Nama barang (opsional)</div><input id="eNm" autocomplete="off">
+    <div class="lb">PN per company</div>
+    <div id="eRows"></div>
+    <button class="btn sm" id="eMore">+ company lain</button>
+    <div class="hint">Pengganti: pisah pakai <code>;</code>, contoh <code>002;002A;002B</code> (pertama = utama). Kosongkan baris company yang tidak dipakai.</div>
+    <div id="eMsg" class="msg"></div>
+    <div class="act"><button class="btn" id="eSave">Simpan</button><button class="btn pri" id="eSave2">Simpan &amp; tutup</button></div>
   </dialog>
   <dialog id="dImp">
     <div class="dh"><h3>Import CSV / Excel</h3><button class="x" id="iX" aria-label="Tutup">×</button></div>
@@ -242,8 +273,6 @@ function chrome(){
     $('#authSubmit').disabled=false;
   };
   $('#authSubmit').onclick=submitAuth;
-  $('#tabLogin').onclick=()=>setAuthMode('login');
-  $('#tabRegister').onclick=()=>setAuthMode('register');
   $('#authX').onclick=()=>$('#dAuth').close();
   $('#authCancel').onclick=()=>$('#dAuth').close();
   $('#dAuth').addEventListener('keydown',e=>{
@@ -257,6 +286,92 @@ function chrome(){
     let v=false;try{v=localStorage.getItem('cmpDense')==='1'}catch(e){}
     set(v);dn.onclick=()=>set(!document.body.classList.contains('compact'));
   }
+
+  // --- edit dialog
+  let editId=null;
+  const openEdit=async(id)=>{
+    if(!CURRENT_USER){
+      openAuth('Silakan masuk atau daftar terlebih dahulu untuk mengedit data PN.');
+      return;
+    }
+    editId=id;
+    $('#eNm').value='';$('#eMsg').textContent='';$('#eRows').innerHTML='';
+    try{
+      const r=await fetch('/api/items/'+id).then(x=>x.json());
+      if(r.error){toast.error(r.error);return;}
+      $('#eNm').value=r.name||'';
+      if(r.entries && r.entries.length){
+        r.entries.forEach(en=>addEditRow(en.company,true,en.pns||''));
+      }else{
+        COMPS.forEach(c=>addEditRow(c,true,''));if(!COMPS.length){addEditRow('',false,'');addEditRow('',false,'');}
+      }
+      $('#dEdit').showModal();($('#eRows .p')||$('#eNm')).focus();
+    }catch(e){toast.error('Gagal memuat data')}
+  };
+  const addEditRow=(c,fixed,vals='')=>{
+    const d=document.createElement('div');d.className='r';
+    if(fixed){
+      d.dataset.c=c||'';
+      d.innerHTML=`<span class="cn" title="${esc(c||'')}">${esc(c||'')}</span><input class="p" placeholder="PN" autocomplete="off"><span></span>`;
+    }else{
+      d.innerHTML=`<input class="c" list="cl" placeholder="Nama company" autocomplete="off"><input class="p" placeholder="PN" autocomplete="off"><button class="x" title="Hapus baris">×</button>`;
+    }
+    $('#eRows').appendChild(d);
+    const p=d.querySelector('.p');
+    if(p)p.value = vals==null?'':String(vals);
+    const cc=d.querySelector('.c');
+    if(cc && !fixed) cc.value = c==null?'':String(c);
+  };
+  const saveEdit=async keep=>{
+    const entries=$$('#eRows .r').map(r=>({company:r.dataset.c||r.querySelector('.c').value,pns:r.querySelector('.p').value}));
+    const r=await (await fetch('/api/items/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:$('#eNm').value,entries})})).json();
+    if(r.error){$('#eMsg').className='msg err';$('#eMsg').textContent=r.error;toast.error('Gagal menyimpan',{description:r.error});return}
+    toast.success('Tersimpan',{description:`${r.pn_added} PN diperbarui`});
+    await changed();
+    if(keep){
+      $('#eMsg').className='msg ok';$('#eMsg').textContent=`Tersimpan (${r.pn_added} PN).`;
+    }else{ $('#eMsg').textContent=''; $('#dEdit').close(); }
+  };
+  document.addEventListener('click',async e=>{
+    const eb=e.target.closest('[data-edit]');
+    if(eb){
+      e.preventDefault();
+      if(eb.disabled)return;
+      openEdit(eb.dataset.edit);
+      return;
+    }
+    const ab=e.target.closest('[data-approve]');
+    if(ab){
+      e.preventDefault();
+      if(!CURRENT_USER){openAuth('Silakan masuk untuk approve data PN.');return;}
+      const id=ab.dataset.approve;
+      const appr=ab.dataset.appr==='1';
+      const ok = confirm(appr?'Yakin mau approve item ini?':'Yakin mau batalin approve item ini?');
+      if(!ok)return;
+      ab.disabled=true;
+      try{
+        const r=await fetch('/api/items/'+id+'/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({approve:appr})}).then(x=>x.json());
+        if(r.error){toast.error(r.error);ab.disabled=false;return;}
+        toast.success(appr?'Disetujui':'Approval dibatalkan');
+        await changed();
+      }catch(err){toast.error('Gagal');ab.disabled=false;}
+      return;
+    }
+  });
+  $('#eX').onclick=()=>$('#dEdit').close();
+  $('#eSave').onclick=()=>saveEdit(true);
+  $('#eSave2').onclick=()=>saveEdit(false);
+  $('#eMore').onclick=()=>{addEditRow('',false,'');$$('#eRows .c').pop().focus()};
+  $('#eRows').addEventListener('click',e=>{if(e.target.classList.contains('x'))e.target.closest('.r').remove()});
+  $('#dEdit').addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();saveEdit(true);return}
+    if(e.key==='Enter'&&e.target.classList.contains('p')){
+      e.preventDefault();
+      const ps=$$('#eRows .p'),n=ps.indexOf(e.target);
+      n<ps.length-1?ps[n+1].focus():saveEdit(true);
+    }
+  });
 
   // --- tambah manual
   const addRow=(c,fixed)=>{
