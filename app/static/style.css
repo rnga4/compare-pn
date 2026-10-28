@@ -67,8 +67,8 @@ tbody tr:hover td{background:var(--acbg)}
 .pn:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .pn.main{font-weight:700;background:var(--hd)}
 .pn.rep{font-size:14px;color:var(--mu)}
-.pnwrap{display:inline-flex;align-items:center;gap:4px;vertical-align:middle}
-.ap-chk{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(34,197,94,.15);color:#22c55e;font-size:11px;font-weight:700;line-height:1;flex:0 0 auto;cursor:default}
+.pnwrap{display:inline-flex;align-items:center;gap:6px;vertical-align:middle}
+.ap-chk{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:transparent;color:#22c55e;font-size:12px;font-weight:700;line-height:1;flex:0 0 auto;cursor:default}
 .pn.hit{background:var(--mk);color:var(--tx)}
 .empty{text-align:center;color:var(--mu);padding:30px 10px}
 .empty code,.hint code{background:var(--hd);padding:1px 6px;border-radius:5px}
