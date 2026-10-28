@@ -59,7 +59,7 @@ $('#q').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(go,250)});
 $('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearQ()});
 $('#qc').onclick=clearQ;
 $('#expCsv').onclick=()=>{
-  const rows=[['Barang','Company','PN','Urutan','Diupdate Oleh']];
+  const rows=[['Barang','Company','PN','Urutan']];
   const ths=Array.from(document.querySelectorAll('#head th'));
   document.querySelectorAll('#body tr').forEach(tr=>{
     const nm=tr.querySelector('.nm')?.textContent.replace(/^\d+\s*/,'').trim()||'';
