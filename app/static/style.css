@@ -45,7 +45,7 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
 /* hero + search */
 .hero{width:100%;max-width:720px;margin:12vh auto 0;text-align:center;transition:margin .25s,max-width .25s}
 .hero h1{margin:0 0 8px;font-size:34px;line-height:1.2;letter-spacing:-0.01em}.hero p{margin:0 0 22px;font-size:17px;line-height:1.7}
-.has-q .hero{max-width:none;margin:0;text-align:left}
+.has-q .hero{max-width:640px;margin:0 auto 12px;text-align:center}
 .has-q .hero h1,.has-q .hero p{display:none}
 .sb{position:relative}
 .sb input{width:100%;font-size:20px;padding:16px 56px 16px 20px;border-radius:14px}
@@ -54,6 +54,204 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
 .bar,.pager{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .pager input{width:72px;padding:6px 8px}
 .bar input.f{flex:1;min-width:200px}
+
+/* Centered Search Bar on List Page */
+.search-center-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 4px 0 12px;
+}
+
+.search-center-box {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  align-items: center;
+}
+
+.search-center-box .search-center-input {
+  width: 100%;
+  padding: 10px 42px 10px 40px;
+  font-size: 14.5px;
+  border-radius: 9999px;
+  background: var(--card);
+  border: 1px solid var(--bd);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  box-sizing: border-box;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.search-center-box .search-center-input:focus {
+  background: var(--bg);
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--acbg), 0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
+.search-center-box .search-center-ico {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--mu);
+  font-size: 20px;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.search-center-box .qc {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
+}
+
+/* Compact Controls Toolbar */
+.control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 38px;
+  margin-bottom: 8px;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.compact-select {
+  padding: 5px 10px;
+  font-size: 13px;
+  min-height: 32px;
+  border-radius: 9px;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.filter-dropdown {
+  width: 280px;
+  padding: 14px;
+  box-sizing: border-box;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 3px 10px rgba(0, 0, 0, 0.08);
+}
+
+.filter-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--bd);
+}
+
+.filter-dropdown-header b {
+  color: var(--tx);
+  font-size: 13.5px;
+}
+
+.filter-reset-btn {
+  background: none;
+  border: none;
+  color: var(--ac);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.filter-reset-btn:hover {
+  background: var(--acbg);
+  text-decoration: underline;
+}
+
+.filter-field {
+  margin-bottom: 10px;
+}
+
+.filter-field:last-child {
+  margin-bottom: 0;
+}
+
+.filter-field label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--mu);
+  margin-bottom: 4px;
+}
+
+.filter-field select {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.filter-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ac);
+  display: inline-block;
+  margin-left: 2px;
+}
+
+.active-filter-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  background: var(--acbg);
+  color: var(--ac);
+  border: 1px solid color-mix(in srgb, var(--ac) 30%, transparent);
+  line-height: 1.3;
+}
+
+.filter-chip button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.75;
+}
+
+.filter-chip button:hover {
+  opacity: 1;
+}
 
 /* Action Menu Dropdown */
 .menu-wrap {
