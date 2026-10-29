@@ -398,9 +398,12 @@ async function loadAdminUsers(){
         try{ const d = new Date(u.created_at); if(!isNaN(d.getTime())) createdDate = d.toLocaleDateString('id-ID'); }catch(e){}
       }
       const isSelf = CURRENT_USER && (CURRENT_USER.id === u.id);
-      const toggleBtn = isSelf 
+      const actionHtml = isSelf 
         ? '<span class="mu" style="font-size:11px">(Akun Anda)</span>' 
-        : `<button class="btn sm" data-toggle-admin="${u.id}" data-current="${u.is_admin ? '1':'0'}">${u.is_admin ? 'Jadikan Member' : 'Jadikan Admin'}</button>`;
+        : `<div style="display:inline-flex;align-items:center;gap:6px">
+             <button class="btn sm" data-toggle-admin="${u.id}" data-current="${u.is_admin ? '1':'0'}" title="${u.is_admin ? 'Ubah role jadi Member' : 'Ubah role jadi Admin'}">${u.is_admin ? 'Jadikan Member' : 'Jadikan Admin'}</button>
+             <button class="btn sm danger" data-delete-user="${u.id}" data-username="${esc(u.username)}" title="Hapus akun pengguna ${esc(u.username)}">Hapus</button>
+           </div>`;
       return `
         <tr>
           <td>${u.id}</td>
@@ -411,7 +414,7 @@ async function loadAdminUsers(){
           <td>${fmt(u.items_updated)}</td>
           <td>${isOnline ? `<span class="badge-online"><span class="status-dot online"></span>${u.active_sessions} sesi aktif</span>` : '<span class="badge-offline"><span class="status-dot offline"></span>Offline</span>'}</td>
           <td>${lastAct}</td>
-          <td>${toggleBtn}</td>
+          <td>${actionHtml}</td>
         </tr>
       `;
     }).join('');
@@ -1718,6 +1721,37 @@ function chrome(){
         }
       }catch(err){ toast.error('Gagal mengubah role'); }
       tbAdmin.disabled = false;
+      return;
+    }
+
+    // delete user account
+    const delUserBtn = e.target.closest('[data-delete-user]');
+    if(delUserBtn){
+      e.preventDefault();
+      const uid = delUserBtn.dataset.deleteUser;
+      const uname = delUserBtn.dataset.username || 'pengguna';
+      if(!uid) return;
+      const ok = await confirmDialog({
+        title: `Hapus Akun '${uname}'?`,
+        message: `Akun pengguna '${uname}' (ID: ${uid}) beserta seluruh sesinya akan dihapus permanen. Data part number yang pernah dibuat atau disetujui akan tetap tersimpan aman di sistem. Tindakan ini tidak dapat dibatalkan.`,
+        confirmText: 'Hapus Akun',
+        type: 'danger'
+      });
+      if(!ok) return;
+      delUserBtn.disabled = true;
+      try{
+        const r = await fetch(`/api/admin/users/${uid}`, {method: 'DELETE'}).then(x=>x.json());
+        if(r.error) {
+          toast.error(r.error);
+        } else {
+          toast.success(r.message || `Akun '${uname}' berhasil dihapus`);
+          await loadAdminUsers();
+          await loadAdminStats();
+        }
+      }catch(err){
+        toast.error('Gagal menghapus akun pengguna');
+      }
+      delUserBtn.disabled = false;
       return;
     }
 

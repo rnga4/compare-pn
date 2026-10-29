@@ -1192,6 +1192,32 @@ def admin_toggle_admin(user_id: int, request: Request):
                      f"Mengubah role user '{target['username']}' menjadi {'Admin' if new_status else 'Member'}", client_ip)
     return {"ok": True, "is_admin": new_status}
 
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(user_id: int, request: Request):
+    user = get_current_user(request)
+    if not user or not user.get("is_admin"):
+        return Response(status_code=403, content='{"error":"Akses khusus admin"}', media_type="application/json")
+    if user["id"] == user_id:
+        return {"error": "Tidak dapat menghapus akun sendiri yang sedang aktif"}
+    client_ip = get_client_ip(request)
+    with conn() as c, c.transaction():
+        target = c.execute("SELECT id, username, is_admin FROM users WHERE id = %s", (user_id,)).fetchone()
+        if not target:
+            return {"error": "User tidak ditemukan"}
+        if target["is_admin"]:
+            admin_count = c.execute("SELECT count(*) AS n FROM users WHERE is_admin = true").fetchone()["n"]
+            if admin_count <= 1:
+                return {"error": "Tidak dapat menghapus akun admin terakhir pada sistem"}
+        c.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        log_activity(
+            user["id"],
+            user["username"],
+            "ADMIN_DELETE_USER",
+            f"Menghapus akun user '{target['username']}' (ID: {user_id})",
+            client_ip
+        )
+    return {"ok": True, "message": f"Akun pengguna '{target['username']}' berhasil dihapus"}
+
 @app.get("/api/admin/sessions")
 def admin_sessions(request: Request):
     user = get_current_user(request)
