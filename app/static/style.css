@@ -8,6 +8,7 @@ body.theme-mingyu{--bg:#fbf8f3;--card:#ffffff;--tx:#2c2214;--mu:#756550;--bd:#e8
 body.theme-ocean{--bg:#f0f7fb;--card:#ffffff;--tx:#0f2c3d;--mu:#4b6f84;--bd:#cfe0eb;--ac:#0284c7;--acbg:#e0f2fe;--actx:#ffffff;--mk:#fef08a;--ok:#15803d;--er:#b91c1c;--wn:#b45309;--hd:#e1eef6}
 body.theme-retrolight{--bg:#f7f6f2;--card:#ffffff;--tx:#212529;--mu:#606770;--bd:#dedcd4;--ac:#4f46e5;--acbg:#eeedfd;--actx:#ffffff;--mk:#fef08a;--ok:#15803d;--er:#b91c1c;--wn:#b45309;--hd:#eceae2}
 *{box-sizing:border-box}
+html{scrollbar-gutter:stable}
 html,body{height:100%;font-family:Roboto,system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color-scheme:light dark}
 body{margin:0;display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--bg);color:var(--tx);font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
 a{color:var(--ac)}
@@ -163,7 +164,21 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
   position: fixed !important;
   z-index: 9999 !important;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22), 0 3px 10px rgba(0, 0, 0, 0.1);
-  min-width: 220px;
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+  box-sizing: border-box;
+}
+
+.row-action-popup .menu-item {
+  width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+}
+
+.row-action-popup .menu-item-desc {
+  white-space: normal;
+  word-break: break-word;
 }
 
 .menu-item-danger {
@@ -315,19 +330,20 @@ body.dark .pn.rep{color:#cbd5e1;border-color:#3e4759}
 .card b{display:block;margin-bottom:4px}.card span{color:var(--mu);font-size:13px}
 
 /* dialog */
-dialog{border:1px solid var(--bd);border-radius:24px;background:var(--card);color:var(--tx);padding:24px;width:min(560px,94vw);max-height:92vh;overflow:auto;margin:auto;box-shadow:0 24px 60px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.2)}
-dialog[open]{animation:modalSlideIn .28s cubic-bezier(.16,1,.3,1) forwards}
+dialog{border:1px solid var(--bd);border-radius:24px;background:var(--card);color:var(--tx);padding:24px;width:min(540px,94vw);max-width:min(540px,94vw);max-height:90vh;overflow-y:auto;overflow-x:hidden;margin:auto;box-sizing:border-box;box-shadow:0 24px 60px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.2)}
+dialog[open]{animation:modalSlideIn .24s cubic-bezier(.16,1,.3,1) forwards}
 dialog::backdrop{background:rgba(0,0,0,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-dialog[open]::backdrop{animation:backdropFadeIn .24s cubic-bezier(.16,1,.3,1) forwards}
-#dImp{width:min(940px,96vw)}
-.dh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;animation:modalContentFade .25s ease-out backwards .04s}
-.dh h3{margin:0}
-.x{border:0;background:none;color:var(--mu);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;transition:transform .25s cubic-bezier(.34,1.56,.64,1),color .15s ease,background .15s ease}
+dialog[open]::backdrop{animation:backdropFadeIn .2s ease forwards}
+#dImp{width:min(840px,95vw);max-width:min(840px,95vw)}
+.dh{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;min-width:0}
+.dh h3{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.x{border:0;background:none;color:var(--mu);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;transition:transform .25s cubic-bezier(.34,1.56,.64,1),color .15s ease,background .15s ease;flex-shrink:0}
 .x:hover{color:var(--er);background:color-mix(in srgb,var(--er) 12%,transparent);transform:rotate(90deg) scale(1.15)}
 .x:active{transform:rotate(90deg) scale(.92)}
 .lb{margin:12px 0 4px;color:var(--mu);font-size:13px;animation:modalContentFade .25s ease-out backwards .06s}
-dialog input{width:100%}
-.r{display:grid;grid-template-columns:120px 1fr 30px;gap:8px;align-items:center;margin:6px 0;animation:modalContentFade .25s ease-out backwards .08s}
+dialog input{width:100%;min-width:0;box-sizing:border-box}
+.r{display:grid;grid-template-columns:120px minmax(0,1fr) 30px;gap:8px;align-items:center;margin:6px 0;width:100%;box-sizing:border-box;animation:modalContentFade .25s ease-out backwards .08s}
+.r input{min-width:0;width:100%;box-sizing:border-box}
 .cn{font-weight:600;white-space:normal;word-wrap:break-word;overflow-wrap:break-word}
 .act{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;animation:modalContentFade .25s ease-out backwards .1s}
 .hint{font-size:13px;color:var(--mu);margin:8px 0}
@@ -534,7 +550,8 @@ body.theme-cyberpunk .top-btn:hover {
    CONFIRMATION MODAL DIALOG
    ===================================================================== */
 dialog.confirm-dialog {
-  width: min(440px, 92vw);
+  width: min(420px, 92vw);
+  max-width: min(420px, 92vw);
   padding: 28px 24px 24px;
   border-radius: 22px;
   background: var(--card);
@@ -542,6 +559,7 @@ dialog.confirm-dialog {
   box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.2);
   color: var(--tx);
   overflow: visible;
+  box-sizing: border-box;
 }
 dialog.confirm-dialog[open] {
   animation: modalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -679,11 +697,11 @@ body.theme-cyberpunk .btn.pri.btn-success {
 @keyframes modalSlideIn {
   0% {
     opacity: 0;
-    transform: translateY(22px) scale(0.96);
+    transform: translateY(14px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -1112,9 +1130,10 @@ body.theme-cyberpunk .btn.pri.btn-success {
 
 /* Riwayat (Item History) Dialog */
 dialog#dHistory {
-  max-width: 720px;
-  width: 94vw;
-  border-radius: 12px;
+  width: min(560px, 94vw) !important;
+  max-width: min(560px, 94vw) !important;
+  border-radius: 18px;
+  box-sizing: border-box;
 }
 dialog#dHistory[open] {
   display: flex;

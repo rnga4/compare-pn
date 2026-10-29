@@ -1472,7 +1472,7 @@ function chrome(){
     activeRowTrigger = trigger;
 
     const rect = trigger.getBoundingClientRect();
-    const menuWidth = menu.offsetWidth || 230;
+    const menuWidth = 220;
     const menuHeight = menu.offsetHeight || 250;
 
     let left = rect.right - menuWidth;
