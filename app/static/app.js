@@ -100,7 +100,7 @@ function rowCells(i,q,no){
          <span>Aksi</span>
          <span class="menu-arrow">▾</span>
        </button>`;
-  const actCol = `<td class="act-col"><div class="act-cell-wrap">${chk}${rowMenuBtn}</div></td>`;
+  const actCol = `<td class="act-col"><div class="act-cell-wrap"><span class="act-spacer" aria-hidden="true"></span>${rowMenuBtn}<span class="ap-chk-slot">${chk}</span></div></td>`;
   const nmCell = nm;
   return `<td class="nm">${no?`<span class="no">${no}</span>`:''}${nmCell}</td>`
     +COMPS.map(c=>`<td>${cell(m[c],q)}</td>`).join('')

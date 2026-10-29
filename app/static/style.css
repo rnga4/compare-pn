@@ -198,17 +198,17 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
 
 .act-col {
   text-align: center;
-  width: 105px;
-  min-width: 105px;
-  max-width: 105px;
+  width: 116px;
+  min-width: 116px;
+  max-width: 116px;
   vertical-align: middle;
 }
 
 .act-th {
   text-align: center;
-  width: 105px;
-  min-width: 105px;
-  max-width: 105px;
+  width: 116px;
+  min-width: 116px;
+  max-width: 116px;
 }
 
 .act-cell-wrap {
@@ -217,6 +217,22 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
   justify-content: center;
   gap: 6px;
   vertical-align: middle;
+}
+
+.act-spacer {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.ap-chk-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
 }
 
 .row-act-trigger {
