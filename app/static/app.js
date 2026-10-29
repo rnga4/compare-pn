@@ -509,14 +509,16 @@ async function openItemHistory(itemId){
       cnt.innerHTML = `<div class="msg err">${esc(r.error)}</div>`;
       return;
     }
-    title.textContent = `Riwayat: ${r.item_name || 'Barang #' + itemId}`;
-    if(!r.history || !r.history.length){
+    const historyList = Array.isArray(r) ? r : (r.history || []);
+    const itemName = (r && !Array.isArray(r) && r.item_name) ? r.item_name : ('Barang #' + itemId);
+    title.textContent = `Riwayat: ${itemName}`;
+    if(!historyList.length){
       cnt.innerHTML = '<div class="mu" style="text-align:center;padding:24px">Belum ada catatan riwayat untuk barang ini.</div>';
       return;
     }
     cnt.innerHTML = `
       <div class="timeline">
-        ${r.history.map(h => {
+        ${historyList.map(h => {
           let t = '–';
           if(h.created_at){
             try{ const dt = new Date(h.created_at); if(!isNaN(dt.getTime())) t = dt.toLocaleString('id-ID'); }catch(e){}
@@ -527,20 +529,24 @@ async function openItemHistory(itemId){
             bodyHtml = `<div>Barang dibuat pertama kali oleh <b>${esc(h.username || 'Sistem')}</b>.</div>`;
           }else if(h.action === 'UPDATED'){
             let nameDiff = '';
-            if(h.name_before !== h.name_after){
-              nameDiff = `<div class="diff-name-change">Perubahan nama: <s>${esc(h.name_before || '(tanpa nama)')}</s> &rarr; <b>${esc(h.name_after || '(tanpa nama)')}</b></div>`;
+            if(h.name_before && h.name_after && h.name_before !== h.name_after){
+              nameDiff = `<div class="diff-name-change">Perubahan nama: <s>${esc(h.name_before)}</s> &rarr; <b>${esc(h.name_after)}</b></div>`;
             }
-            bodyHtml = nameDiff || '<div>Data part number diperbarui.</div>';
+            bodyHtml = nameDiff ? `${nameDiff}<div style="margin-top:4px">Data part number diperbarui.</div>` : '<div>Data part number diperbarui.</div>';
           }else if(h.action === 'APPROVED'){
             bodyHtml = `<div>Status approval disetujui (kroscek selesai) oleh <b>${esc(h.username || 'Admin')}</b>.</div>`;
           }else if(h.action === 'UNAPPROVED'){
             bodyHtml = `<div>Status persetujuan dibatalkan oleh <b>${esc(h.username || 'Admin')}</b>.</div>`;
           }
 
+          let snapList = h.snapshot;
+          if(typeof snapList === 'string'){
+            try { snapList = JSON.parse(snapList); } catch(e){ snapList = []; }
+          }
           let snapHtml = '';
-          if(h.snapshot && Array.isArray(h.snapshot) && h.snapshot.length > 0){
+          if(snapList && Array.isArray(snapList) && snapList.length > 0){
             snapHtml = `<div class="diff-tags-container">
-              ${h.snapshot.map(s => `<span class="diff-tag"><span class="company-badge">${esc(s.company)}:</span> ${esc(s.pn)}</span>`).join('')}
+              ${snapList.map(s => `<span class="diff-tag"><span class="company-badge">${esc(s.company)}:</span> ${esc(s.pn)}</span>`).join('')}
             </div>`;
           }
 

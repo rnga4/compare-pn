@@ -1277,6 +1277,7 @@ def admin_logs_export(q: str = "", action: str = "", request: Request = None):
 @app.get("/api/items/{item_id}/history")
 def get_item_history(item_id: int):
     with conn() as c:
+        item = c.execute("SELECT id, name FROM items WHERE id = %s", (item_id,)).fetchone()
         rows = c.execute("""
             SELECT id, item_id, user_id, username, action, name_before, name_after, snapshot, created_at
             FROM item_history
@@ -1284,7 +1285,11 @@ def get_item_history(item_id: int):
             ORDER BY id DESC
             LIMIT 50
         """, (item_id,)).fetchall()
-    return rows
+    return {
+        "item_id": item_id,
+        "item_name": item["name"] if item else None,
+        "history": rows
+    }
 
 # --- COMPANY MANAGEMENT ---
 @app.get("/api/admin/companies")
