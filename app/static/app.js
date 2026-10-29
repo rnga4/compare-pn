@@ -85,9 +85,12 @@ function rowCells(i,q,no){
     }
     if (!apTip) apTip = `Disetujui oleh ${i.approved_by_name}`;
   }
-  const chk = isApproved ? `<span class="ap-chk" title="${esc(apTip)}" aria-label="${esc(apTip)}">✓</span>` : '';
+  const btnTitle = isApproved ? `Buka menu aksi (${apTip})` : 'Buka menu aksi barang ini';
+  const apBadge = isApproved
+    ? `<span class="row-act-badge" aria-hidden="true"><svg viewBox="0 0 12 12" width="8" height="8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5 6.5 5 9 9.5 3.5"/></svg></span>`
+    : '';
 
-  const rowMenuBtn = `<button type="button" class="btn sm row-act-trigger"
+  const rowMenuBtn = `<button type="button" class="btn sm row-act-trigger${isApproved ? ' is-approved' : ''}"
          data-item-id="${i.id}"
          data-item-name="${esc(i.name || '')}"
          data-can-edit="${canEdit ? '1' : '0'}"
@@ -96,11 +99,12 @@ function rowCells(i,q,no){
          data-approved-at="${esc(i.approved_at || '')}"
          aria-haspopup="true"
          aria-expanded="false"
-         aria-label="Menu aksi ${esc(i.name || 'barang')}"
-         title="Buka menu aksi barang ini">
+         aria-label="${esc(isApproved ? `Menu aksi ${i.name || 'barang'} (Disetujui)` : `Menu aksi ${i.name || 'barang'}`)}"
+         title="${esc(btnTitle)}">
          <svg class="row-act-ico" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="19" r="2.2"/></svg>
+         ${apBadge}
        </button>`;
-  const actCol = `<td class="act-col"><div class="act-cell-wrap"><span class="act-spacer" aria-hidden="true"></span>${rowMenuBtn}<span class="ap-chk-slot">${chk}</span></div></td>`;
+  const actCol = `<td class="act-col">${rowMenuBtn}</td>`;
   const nmCell = nm;
   return `<td class="nm">${no?`<span class="no">${no}</span>`:''}${nmCell}</td>`
     +COMPS.map(c=>`<td>${cell(m[c],q)}</td>`).join('')

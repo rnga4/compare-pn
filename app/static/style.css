@@ -396,44 +396,24 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
 
 .act-col {
   text-align: center;
-  width: 86px;
-  min-width: 86px;
-  max-width: 86px;
+  width: 50px;
+  min-width: 50px;
+  max-width: 50px;
+  padding: 6px 4px;
   vertical-align: middle;
 }
 
 .act-th {
   text-align: center;
-  width: 86px;
-  min-width: 86px;
-  max-width: 86px;
-}
-
-.act-cell-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  vertical-align: middle;
-}
-
-.act-spacer {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-}
-
-.ap-chk-slot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
+  width: 50px;
+  min-width: 50px;
+  max-width: 50px;
+  padding: 8px 4px;
 }
 
 .row-act-trigger {
+  position: relative;
+  overflow: visible;
   width: 28px;
   height: 28px;
   min-height: 28px;
@@ -449,6 +429,7 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
   cursor: pointer;
   transition: all 0.16s ease;
   box-sizing: border-box;
+  vertical-align: middle;
 }
 
 .row-act-trigger:hover {
@@ -463,6 +444,58 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
   background: var(--acbg);
   border-color: var(--ac);
   color: var(--ac);
+}
+
+.row-act-trigger.is-approved {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.row-act-trigger.is-approved:hover {
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+body.dark .row-act-trigger.is-approved {
+  border-color: rgba(74, 222, 128, 0.4);
+}
+
+body.dark .row-act-trigger.is-approved:hover {
+  border-color: #4ade80;
+  color: #4ade80;
+}
+
+.row-act-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #ffffff;
+  border: 1.5px solid var(--card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.16s ease;
+}
+
+.row-act-trigger:hover .row-act-badge {
+  transform: scale(1.15);
+}
+
+body.dark .row-act-badge {
+  background: #22c55e;
+  color: #052e16;
+  border-color: #1e293b;
+}
+
+body.theme-cyberpunk .row-act-badge {
+  background: #00ff88;
+  color: #020617;
+  border-color: #0d1322;
 }
 
 .row-act-ico {
