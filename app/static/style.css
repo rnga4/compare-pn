@@ -269,9 +269,32 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
 .search-center-wrap {
   width: 100%;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: 8px;
   margin: 4px 0 12px;
+}
+
+.search-stats-sub {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mu);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.15px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bd) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bd) 55%, transparent);
+  transition: all 0.16s ease;
+  user-select: none;
+}
+.search-stats-sub:empty {
+  display: none;
 }
 
 .search-center-box {

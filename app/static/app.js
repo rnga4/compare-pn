@@ -178,8 +178,10 @@ function openAuth(msg,mode='login'){
 async function loadMeta(){
   COMPS=await jget('/api/companies');
   STATS=await jget('/api/stats');
-  $('#stats').textContent=`${fmt(STATS.items)} barang · ${fmt(STATS.pns)} PN · ${STATS.companies} company`;
-  $('#cl').innerHTML=COMPS.map(c=>`<option value="${esc(c)}">`).join('');
+  const s=$('#stats');
+  if(s) s.textContent=`${fmt(STATS.items)} barang · ${fmt(STATS.pns)} PN · ${STATS.companies} company`;
+  const cl=$('#cl');
+  if(cl) cl.innerHTML=COMPS.map(c=>`<option value="${esc(c)}">`).join('');
 }
 const changed=async()=>{await loadMeta();document.dispatchEvent(new Event('data-changed'))};
 
@@ -846,9 +848,6 @@ function chrome(){
         '<a href="/" class="'+(pg==='search'?'on':'')+'">Cari</a>'+
         '<a href="/list" class="'+(pg==='list'?'on':'')+'">Daftar</a>'+
       '</nav>'+
-    '</div>'+
-    '<div class="nav-center">'+
-      '<span class="nav-stats mu" id="stats"></span>'+
     '</div>'+
     '<div class="nav-right">'+
       '<div id="navAuth" class="nav-group"></div>'+
