@@ -636,7 +636,7 @@ def add_item(body: NewItem, request: Request):
                 r = c.execute("""SELECT i.name, p.pn FROM part_numbers p
                                  JOIN companies co ON co.id = p.company_id
                                  JOIN items i ON i.id = p.item_id
-                                 WHERE co.name = %s AND p.pn_norm = %s""",
+                                 WHERE lower(co.name) = lower(%s) AND p.pn_norm = %s""",
                               (comp, norm(pn))).fetchone()
                 if r:
                     return {"error": f"PN {pn} sudah ada di {comp} (barang: {r['name'] or 'tanpa nama'}, PN {r['pn']})"}
@@ -645,9 +645,13 @@ def add_item(body: NewItem, request: Request):
         added = 0
         seen_pns = set()
         for comp, pns in entries:
-            cid = c.execute("""INSERT INTO companies(name) VALUES (%s)
-                               ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id""",
-                            (comp,)).fetchone()["id"]
+            existing_co = c.execute("SELECT id FROM companies WHERE lower(name) = lower(%s)", (comp,)).fetchone()
+            if existing_co:
+                cid = existing_co["id"]
+            else:
+                cid = c.execute("""INSERT INTO companies(name) VALUES (%s)
+                                   ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id""",
+                                (comp,)).fetchone()["id"]
             for seq, pn in enumerate(pns):
                 norm_pn = norm(pn)
                 if (cid, norm_pn) in seen_pns:
@@ -681,15 +685,14 @@ def list_page():
 def get_item_detail(item_id: int, request: Request):
     user = get_current_user(request)
     if not user:
-        return {"error": "Silakan login terlebih dahulu untuk mengedit data"}
+        return {"error": "Silakan login terlebih dahulu untuk mengakses data barang"}
     with conn() as c:
         item = c.execute("SELECT id, name, user_id, approved_by FROM items WHERE id = %s", (item_id,)).fetchone()
         if not item:
             return {"error": "Data tidak ditemukan"}
-        if item["user_id"] is not None and item["user_id"] != user["id"]:
-            return {"error": "Tidak diizinkan mengedit data ini"}
-        if item.get("approved_by") is not None:
-            return {"error": "Batalkan status approve terlebih dahulu sebelum mengedit"}
+        is_admin = bool(user.get("is_admin"))
+        can_edit = is_admin or (item["user_id"] is None) or (item["user_id"] == user["id"])
+        is_approved = item.get("approved_by") is not None
         rows = c.execute("""
             SELECT co.name AS company, string_agg(p.pn, ';' ORDER BY p.seq) AS pns
             FROM part_numbers p
@@ -699,7 +702,14 @@ def get_item_detail(item_id: int, request: Request):
             ORDER BY co.id
         """, (item_id,)).fetchall()
     entries = [{"company": r["company"], "pns": r["pns"] or ""} for r in rows]
-    return {"id": item["id"], "name": item["name"] or "", "entries": entries}
+    return {
+        "id": item["id"],
+        "name": item["name"] or "",
+        "entries": entries,
+        "can_edit": can_edit,
+        "is_approved": is_approved,
+        "user_id": item["user_id"],
+    }
 
 @app.put("/api/items/{item_id}")
 def update_item(item_id: int, body: NewItem, request: Request):
@@ -721,7 +731,9 @@ def update_item(item_id: int, body: NewItem, request: Request):
         item = c.execute("SELECT id, user_id, approved_by, name FROM items WHERE id = %s FOR UPDATE", (item_id,)).fetchone()
         if not item:
             return {"error": "Data tidak ditemukan"}
-        if item["user_id"] is not None and item["user_id"] != user["id"]:
+        is_admin = bool(user.get("is_admin"))
+        can_edit = is_admin or (item["user_id"] is None) or (item["user_id"] == user["id"])
+        if not can_edit:
             return {"error": "Tidak diizinkan mengedit data ini"}
         if item.get("approved_by") is not None:
             return {"error": "Batalkan status approve terlebih dahulu sebelum mengedit"}
@@ -731,7 +743,7 @@ def update_item(item_id: int, body: NewItem, request: Request):
                     SELECT i.id, i.name, p.pn FROM part_numbers p
                     JOIN companies co ON co.id = p.company_id
                     JOIN items i ON i.id = p.item_id
-                    WHERE co.name = %s AND p.pn_norm = %s AND p.item_id <> %s
+                    WHERE lower(co.name) = lower(%s) AND p.pn_norm = %s AND p.item_id <> %s
                 """, (comp, norm(pn), item_id)).fetchone()
                 if r:
                     return {"error": f"PN {pn} sudah ada di {comp} (barang: {r['name'] or 'tanpa nama'}, PN {r['pn']})"}
@@ -742,10 +754,14 @@ def update_item(item_id: int, body: NewItem, request: Request):
         added = 0
         seen_pns = set()
         for comp, pns in entries:
-            cid = c.execute("""
-                INSERT INTO companies(name) VALUES (%s)
-                ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id
-            """, (comp,)).fetchone()["id"]
+            existing_co = c.execute("SELECT id FROM companies WHERE lower(name) = lower(%s)", (comp,)).fetchone()
+            if existing_co:
+                cid = existing_co["id"]
+            else:
+                cid = c.execute("""
+                    INSERT INTO companies(name) VALUES (%s)
+                    ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id
+                """, (comp,)).fetchone()["id"]
             for seq, pn in enumerate(pns):
                 norm_pn = norm(pn)
                 if (cid, norm_pn) in seen_pns:
@@ -780,7 +796,9 @@ def delete_item(item_id: int, request: Request):
         item = c.execute("SELECT id, user_id, approved_by, name FROM items WHERE id = %s FOR UPDATE", (item_id,)).fetchone()
         if not item:
             return {"error": "Data tidak ditemukan"}
-        if item["user_id"] is not None and item["user_id"] != user["id"]:
+        is_admin = bool(user.get("is_admin"))
+        can_delete = is_admin or (item["user_id"] is None) or (item["user_id"] == user["id"])
+        if not can_delete:
             return {"error": "Tidak diizinkan menghapus data ini"}
         if item.get("approved_by") is not None:
             return {"error": "Batalkan status approve terlebih dahulu sebelum menghapus"}

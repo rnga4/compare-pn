@@ -102,6 +102,10 @@ $('#q').addEventListener('keydown',e=>{if(e.key==='Escape')clearQ()});
 $('#qc').onclick=clearQ;
 $('#srt').onchange=()=>go();
 $('#expCsv').onclick=()=>{
+  if(!document.querySelector('#body .pn')){
+    toast.info('Tidak ada data pencarian untuk diekspor');
+    return;
+  }
   const rows=[['Barang','Company','PN','Urutan','Diupdate Oleh']];
   const ths=Array.from(document.querySelectorAll('#head th'));
   document.querySelectorAll('#body tr').forEach(tr=>{

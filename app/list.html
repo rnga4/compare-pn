@@ -140,6 +140,10 @@ $('#pg').onchange=e=>{ const val = Math.max(1, Math.min(pages, parseInt(e.target
 $('#sz').onchange=()=>go(1);$('#apf').onchange=()=>go(1);$('#srt').onchange=()=>go(1);
 const ufEl=$('#uf');if(ufEl)ufEl.onchange=()=>go(1);
 $('#expList').onclick=()=>{
+  if(!document.querySelector('#body .pn')){
+    toast.info('Tidak ada data untuk diekspor');
+    return;
+  }
   const q=$('#q').value.trim(),ap=$('#apf').value,uf=$('#uf')?.value||'',srt=$('#srt')?.value||'name_asc';
   const url=`/api/export/csv?q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}&user_filter=${encodeURIComponent(uf)}&sort=${encodeURIComponent(srt)}`;
   toast.info('Menyiapkan file ekspor CSV...');

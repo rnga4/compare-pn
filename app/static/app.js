@@ -1624,6 +1624,14 @@ function chrome(){
     try{
       const r=await fetch('/api/items/'+id).then(x=>x.json());
       if(r.error){toast.error(r.error);return;}
+      if(!r.can_edit){
+        toast.error('Tidak diizinkan mengedit data ini');
+        return;
+      }
+      if(r.is_approved){
+        toast.warning('Batalkan status approve terlebih dahulu sebelum mengedit');
+        return;
+      }
       $('#eNm').value=r.name||'';
       if(r.entries && r.entries.length){
         r.entries.forEach(en=>addEditRow(en.company,true,en.pns||''));
