@@ -96,9 +96,9 @@ function rowCells(i,q,no){
          data-approved-at="${esc(i.approved_at || '')}"
          aria-haspopup="true"
          aria-expanded="false"
+         aria-label="Menu aksi ${esc(i.name || 'barang')}"
          title="Buka menu aksi barang ini">
-         <span>Aksi</span>
-         <span class="menu-arrow">▾</span>
+         <svg class="row-act-ico" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="19" r="2.2"/></svg>
        </button>`;
   const actCol = `<td class="act-col"><div class="act-cell-wrap"><span class="act-spacer" aria-hidden="true"></span>${rowMenuBtn}<span class="ap-chk-slot">${chk}</span></div></td>`;
   const nmCell = nm;
