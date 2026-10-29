@@ -1329,10 +1329,72 @@ function chrome(){
   // kepadatan tabel
   const dn=$('#dn');
   if(dn){
-    const set=v=>{document.body.classList.toggle('compact',v);dn.textContent=v?'Nyaman':'Rapat';try{localStorage.setItem('cmpDense',v?'1':'0')}catch(e){}};
+    const set=v=>{
+      document.body.classList.toggle('compact',v);
+      const lbl=dn.querySelector('.menu-item-label');
+      if(lbl){
+        lbl.textContent=v?'Kerapatan: Nyaman':'Kerapatan: Rapat';
+      }else{
+        dn.textContent=v?'Nyaman':'Rapat';
+      }
+      dn.classList.toggle('active',v);
+      dn.title=v?'Tampilan baris saat ini rapat (klik untuk beralih ke nyaman)':'Tampilan baris saat ini nyaman (klik untuk beralih ke rapat)';
+      try{localStorage.setItem('cmpDense',v?'1':'0')}catch(e){}
+    };
     let v=false;try{v=localStorage.getItem('cmpDense')==='1'}catch(e){}
     set(v);dn.onclick=()=>set(!document.body.classList.contains('compact'));
   }
+
+  // menu aksi dropdown handler
+  document.addEventListener('click',e=>{
+    const trigger=e.target.closest('.menu-trigger');
+    if(trigger){
+      e.stopPropagation();
+      const wrap=trigger.closest('.menu-wrap');
+      const menu=wrap?wrap.querySelector('.menu-dropdown'):null;
+      if(menu){
+        const isHidden=menu.hidden;
+        document.querySelectorAll('.menu-dropdown').forEach(m=>{
+          m.hidden=true;
+          const tr=m.closest('.menu-wrap')?.querySelector('.menu-trigger');
+          if(tr)tr.setAttribute('aria-expanded','false');
+        });
+        menu.hidden=!isHidden;
+        trigger.setAttribute('aria-expanded',String(isHidden));
+      }
+      return;
+    }
+
+    if(!e.target.closest('.menu-dropdown')){
+      document.querySelectorAll('.menu-dropdown').forEach(m=>{
+        m.hidden=true;
+        const tr=m.closest('.menu-wrap')?.querySelector('.menu-trigger');
+        if(tr)tr.setAttribute('aria-expanded','false');
+      });
+    }else{
+      const item=e.target.closest('.menu-item');
+      if(item&&item.id!=='dn'){
+        setTimeout(()=>{
+          const m=item.closest('.menu-dropdown');
+          if(m){
+            m.hidden=true;
+            const tr=m.closest('.menu-wrap')?.querySelector('.menu-trigger');
+            if(tr)tr.setAttribute('aria-expanded','false');
+          }
+        },80);
+      }
+    }
+  });
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){
+      document.querySelectorAll('.menu-dropdown').forEach(m=>{
+        m.hidden=true;
+        const tr=m.closest('.menu-wrap')?.querySelector('.menu-trigger');
+        if(tr)tr.setAttribute('aria-expanded','false');
+      });
+    }
+  });
 
   // --- edit dialog
   let editId=null;

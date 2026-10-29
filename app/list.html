@@ -29,13 +29,37 @@
       <option value="id_asc">Sort: Terlama</option>
     </select>
     <select id="sz"><option value="25">25 / hal</option><option value="50" selected>50 / hal</option><option value="100">100 / hal</option></select>
-    <button class="btn sm" id="cpyAll">Salin Semua PN</button>
-    <button class="btn sm" id="expList">Export CSV</button>
-    <button class="btn sm" id="bPrint" onclick="window.print()">Cetak</button>
-    <button class="btn" id="dn">Rapat</button>
   </div>
 
-  <div class="bar" style="align-items:center"><span class="badge" id="pendBadge" style="display:none"></span></div>
+  <div class="bar action-bar" style="align-items:center;min-height:36px">
+    <span class="badge" id="pendBadge" style="display:none"></span>
+    <span class="sp"></span>
+    <div class="menu-wrap" id="actMenuWrap">
+      <button class="btn sm menu-trigger" id="bActMenu" type="button" aria-expanded="false" aria-haspopup="true">
+        <span>Aksi</span>
+        <span class="menu-arrow">▾</span>
+      </button>
+      <div class="menu-dropdown" id="actDropdown" hidden>
+        <button class="menu-item" id="cpyAll" type="button">
+          <span class="menu-item-label">Salin Semua PN</span>
+          <span class="menu-item-desc">Salin nomor part halaman ini</span>
+        </button>
+        <button class="menu-item" id="expList" type="button">
+          <span class="menu-item-label">Export CSV</span>
+          <span class="menu-item-desc">Unduh seluruh data sesuai filter</span>
+        </button>
+        <button class="menu-item" id="bPrint" onclick="window.print()" type="button">
+          <span class="menu-item-label">Cetak</span>
+          <span class="menu-item-desc">Format cetak printer / PDF</span>
+        </button>
+        <div class="menu-sep"></div>
+        <button class="menu-item" id="dn" type="button">
+          <span class="menu-item-label">Rapat</span>
+          <span class="menu-item-desc">Ubah kerapatan baris tabel</span>
+        </button>
+      </div>
+    </div>
+  </div>
   <div class="tw grow" id="tw"><table class="data"><thead id="head"></thead><tbody id="body"></tbody></table></div>
   <div id="empty"></div>
   <div class="pager" id="pager">
