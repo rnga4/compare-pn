@@ -64,7 +64,7 @@ class CachedStaticFiles(StaticFiles):
     async def get_response(self, path: str, scope):
         response = await super().get_response(path, scope)
         if response.status_code == 200:
-            response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=3600"
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
         return response
 
 app = FastAPI(lifespan=lifespan)
@@ -1197,8 +1197,6 @@ def admin_delete_user(user_id: int, request: Request):
     user = get_current_user(request)
     if not user or not user.get("is_admin"):
         return Response(status_code=403, content='{"error":"Akses khusus admin"}', media_type="application/json")
-    if user["id"] == user_id:
-        return {"error": "Tidak dapat menghapus akun sendiri yang sedang aktif"}
     client_ip = get_client_ip(request)
     with conn() as c, c.transaction():
         target = c.execute("SELECT id, username, is_admin FROM users WHERE id = %s", (user_id,)).fetchone()

@@ -399,10 +399,13 @@ async function loadAdminUsers(){
       }
       const isSelf = CURRENT_USER && (CURRENT_USER.id === u.id);
       const actionHtml = isSelf 
-        ? '<span class="mu" style="font-size:11px">(Akun Anda)</span>' 
+        ? `<div style="display:inline-flex;align-items:center;gap:6px">
+             <span class="mu" style="font-size:11px">(Akun Anda)</span>
+             <button class="btn sm danger" data-delete-user="${u.id}" data-username="${esc(u.username)}" data-is-self="1" title="Hapus akun Anda sendiri">Hapus Akun</button>
+           </div>`
         : `<div style="display:inline-flex;align-items:center;gap:6px">
              <button class="btn sm" data-toggle-admin="${u.id}" data-current="${u.is_admin ? '1':'0'}" title="${u.is_admin ? 'Ubah role jadi Member' : 'Ubah role jadi Admin'}">${u.is_admin ? 'Jadikan Member' : 'Jadikan Admin'}</button>
-             <button class="btn sm danger" data-delete-user="${u.id}" data-username="${esc(u.username)}" title="Hapus akun pengguna ${esc(u.username)}">Hapus</button>
+             <button class="btn sm danger" data-delete-user="${u.id}" data-username="${esc(u.username)}" data-is-self="0" title="Hapus akun pengguna ${esc(u.username)}">Hapus Akun</button>
            </div>`;
       return `
         <tr>
@@ -1730,11 +1733,14 @@ function chrome(){
       e.preventDefault();
       const uid = delUserBtn.dataset.deleteUser;
       const uname = delUserBtn.dataset.username || 'pengguna';
+      const isSelf = delUserBtn.dataset.isSelf === '1';
       if(!uid) return;
       const ok = await confirmDialog({
-        title: `Hapus Akun '${uname}'?`,
-        message: `Akun pengguna '${uname}' (ID: ${uid}) beserta seluruh sesinya akan dihapus permanen. Data part number yang pernah dibuat atau disetujui akan tetap tersimpan aman di sistem. Tindakan ini tidak dapat dibatalkan.`,
-        confirmText: 'Hapus Akun',
+        title: isSelf ? 'Hapus Akun Anda Sendiri?' : `Hapus Akun '${uname}'?`,
+        message: isSelf
+          ? 'Peringatan: Anda akan menghapus akun yang sedang Anda gunakan saat ini. Sesi login akan berakhir dan Anda akan langsung dikeluarkan dari sistem. Data part number yang pernah Anda buat akan tetap tersimpan aman.'
+          : `Akun pengguna '${uname}' (ID: ${uid}) beserta seluruh sesinya akan dihapus permanen. Data part number yang pernah dibuat atau disetujui akan tetap tersimpan aman di sistem. Tindakan ini tidak dapat dibatalkan.`,
+        confirmText: isSelf ? 'Ya, Hapus Akun Saya' : 'Hapus Akun',
         type: 'danger'
       });
       if(!ok) return;
@@ -1743,15 +1749,21 @@ function chrome(){
         const r = await fetch(`/api/admin/users/${uid}`, {method: 'DELETE'}).then(x=>x.json());
         if(r.error) {
           toast.error(r.error);
+          delUserBtn.disabled = false;
         } else {
           toast.success(r.message || `Akun '${uname}' berhasil dihapus`);
-          await loadAdminUsers();
-          await loadAdminStats();
+          if(isSelf){
+            setTimeout(() => { location.href = '/'; }, 1000);
+          } else {
+            await loadAdminUsers();
+            await loadAdminStats();
+            delUserBtn.disabled = false;
+          }
         }
       }catch(err){
         toast.error('Gagal menghapus akun pengguna');
+        delUserBtn.disabled = false;
       }
-      delUserBtn.disabled = false;
       return;
     }
 
