@@ -4,7 +4,7 @@ from contextlib import contextmanager, asynccontextmanager
 import psycopg
 from psycopg.rows import dict_row
 from fastapi import FastAPI, UploadFile, File, Query, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
@@ -60,9 +60,16 @@ async def lifespan(app: FastAPI):
     if pool:
         pool.close()
 
+class CachedStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=3600"
+        return response
+
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+app.mount("/static", CachedStaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 
 SCHEMA = """
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -78,7 +85,10 @@ CREATE TABLE IF NOT EXISTS part_numbers(
 ALTER TABLE part_numbers ADD COLUMN IF NOT EXISTS seq int NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS pn_norm_trgm ON part_numbers USING gin(pn_norm gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS pn_item ON part_numbers(item_id);
+CREATE INDEX IF NOT EXISTS idx_pn_item_comp_seq ON part_numbers(item_id, company_id, seq);
 CREATE INDEX IF NOT EXISTS items_name_trgm ON items USING gin(name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_items_lower_name ON items (lower(name), id);
+CREATE INDEX IF NOT EXISTS idx_items_unapproved ON items(id) WHERE approved_by IS NULL;
 
 CREATE TABLE IF NOT EXISTS users(
   id serial PRIMARY KEY,
@@ -931,6 +941,143 @@ def api_list(request: Request, page: int = 1, size: int = 50, q: str = "", appro
             """, params).fetchall()
 
     return {"total": total, "page": page, "size": size, "items": rows, "pending": pending}
+
+@app.get("/api/export/csv")
+def export_csv(request: Request, q: str = "", approved: str = "", user_filter: str = "", sort: str = "name_asc"):
+    q = (q or "").strip()
+    approved = (approved or "").strip()
+    user_filter = (user_filter or "").strip()
+    sort = (sort or "name_asc").strip().lower()
+
+    if sort == "name_desc":
+        order_clause = "CASE WHEN i.name IS NULL OR trim(i.name) = '' THEN 1 ELSE 0 END, lower(i.name) DESC, i.id DESC"
+    elif sort == "id_desc":
+        order_clause = "i.id DESC"
+    elif sort == "id_asc":
+        order_clause = "i.id ASC"
+    else:
+        order_clause = "CASE WHEN i.name IS NULL OR trim(i.name) = '' THEN 1 ELSE 0 END, lower(i.name) ASC, i.id ASC"
+
+    extra_filters = []
+    extra_params = {}
+    if approved == "1":
+        extra_filters.append("i.approved_by IS NOT NULL")
+    elif approved == "0":
+        extra_filters.append("i.approved_by IS NULL")
+
+    if user_filter == "me":
+        cur_u = get_current_user(request)
+        if cur_u:
+            extra_filters.append("(i.user_id = %(my_uid)s OR i.updated_by = %(my_uid)s)")
+            extra_params["my_uid"] = cur_u["id"]
+        else:
+            extra_filters.append("1=0")
+    elif user_filter.isdigit():
+        extra_filters.append("(i.user_id = %(filter_uid)s OR i.updated_by = %(filter_uid)s)")
+        extra_params["filter_uid"] = int(user_filter)
+
+    tokens = [t for t in q.split() if t]
+    if not tokens:
+        where_clause = ("WHERE " + " AND ".join(extra_filters)) if extra_filters else ""
+        query_sql = f"""
+            SELECT i.name, co.name AS company, p.pn, p.seq,
+                   COALESCE(ub.username, u.username, '') AS author,
+                   CASE WHEN i.approved_by IS NOT NULL THEN 'Disetujui' ELSE 'Belum Disetujui' END AS status_approve,
+                   COALESCE(ua.username, '') AS approved_by,
+                   to_char(i.approved_at, 'YYYY-MM-DD HH24:MI') AS approved_at
+            FROM items i
+            LEFT JOIN users u ON u.id = i.user_id
+            LEFT JOIN users ub ON ub.id = i.updated_by
+            LEFT JOIN users ua ON ua.id = i.approved_by
+            JOIN part_numbers p ON p.item_id = i.id
+            JOIN companies co ON co.id = p.company_id
+            {where_clause}
+            ORDER BY {order_clause}, co.id, p.seq
+        """
+        params = extra_params
+    elif len(tokens) == 1:
+        qn = norm(q)
+        filt_and = (" AND " + " AND ".join(extra_filters)) if extra_filters else ""
+        params = {"qn": qn, "q": q, **extra_params}
+        query_sql = f"""
+            WITH hit AS (
+              SELECT item_id AS id FROM part_numbers p JOIN items i ON i.id = p.item_id WHERE %(qn)s <> '' AND p.pn_norm LIKE '%%' || %(qn)s || '%%' {filt_and}
+              UNION
+              SELECT id FROM items i WHERE i.name ILIKE '%%' || %(q)s || '%%' {filt_and})
+            SELECT i.name, co.name AS company, p.pn, p.seq,
+                   COALESCE(ub.username, u.username, '') AS author,
+                   CASE WHEN i.approved_by IS NOT NULL THEN 'Disetujui' ELSE 'Belum Disetujui' END AS status_approve,
+                   COALESCE(ua.username, '') AS approved_by,
+                   to_char(i.approved_at, 'YYYY-MM-DD HH24:MI') AS approved_at
+            FROM hit h
+            JOIN items i ON i.id = h.id
+            LEFT JOIN users u ON u.id = i.user_id
+            LEFT JOIN users ub ON ub.id = i.updated_by
+            LEFT JOIN users ua ON ua.id = i.approved_by
+            JOIN part_numbers p ON p.item_id = i.id
+            JOIN companies co ON co.id = p.company_id
+            ORDER BY {order_clause}, co.id, p.seq
+        """
+    else:
+        token_where, token_params = build_search_filter(q)
+        all_filters = [token_where] + extra_filters
+        where_clause = "WHERE " + " AND ".join(all_filters)
+        params = {**token_params, **extra_params}
+        query_sql = f"""
+            WITH hit AS (
+              SELECT i.id FROM items i
+              {where_clause})
+            SELECT i.name, co.name AS company, p.pn, p.seq,
+                   COALESCE(ub.username, u.username, '') AS author,
+                   CASE WHEN i.approved_by IS NOT NULL THEN 'Disetujui' ELSE 'Belum Disetujui' END AS status_approve,
+                   COALESCE(ua.username, '') AS approved_by,
+                   to_char(i.approved_at, 'YYYY-MM-DD HH24:MI') AS approved_at
+            FROM hit h
+            JOIN items i ON i.id = h.id
+            LEFT JOIN users u ON u.id = i.user_id
+            LEFT JOIN users ub ON ub.id = i.updated_by
+            LEFT JOIN users ua ON ua.id = i.approved_by
+            JOIN part_numbers p ON p.item_id = i.id
+            JOIN companies co ON co.id = p.company_id
+            ORDER BY {order_clause}, co.id, p.seq
+        """
+
+    def iter_csv():
+        out = io.StringIO()
+        writer = csv.writer(out)
+        yield "\ufeff"
+        writer.writerow(["Barang", "Company", "PN", "Urutan", "Diupdate Oleh", "Status Approve", "Disetujui Oleh", "Tanggal Approve"])
+        yield out.getvalue()
+        out.seek(0)
+        out.truncate(0)
+
+        with conn() as c:
+            cursor = c.execute(query_sql, params)
+            while True:
+                batch = cursor.fetchmany(1000)
+                if not batch:
+                    break
+                for r in batch:
+                    writer.writerow([
+                        r["name"] or "",
+                        r["company"] or "",
+                        r["pn"] or "",
+                        "Utama" if r["seq"] == 0 else "Pengganti",
+                        r["author"] or "",
+                        r["status_approve"] or "",
+                        r["approved_by"] or "",
+                        r["approved_at"] or ""
+                    ])
+                yield out.getvalue()
+                out.seek(0)
+                out.truncate(0)
+
+    filename = f"compare-pn-export-{datetime.now().strftime('%Y%m%d-%H%M')}.csv"
+    return StreamingResponse(
+        iter_csv(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 # --- ADMIN PANEL ENDPOINTS ---
 

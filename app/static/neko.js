@@ -233,17 +233,27 @@
       }
 
       // Track mouse position - set flag on first move
-      document.addEventListener("mousemove", (e) => {
+      this._onMouseMove = (e) => {
         this.mouseX = e.clientX;
         this.mouseY = e.clientY;
         this.hasMouseMoved = true;
-      });
+      };
+      document.addEventListener("mousemove", this._onMouseMove, { passive: true });
 
       // Update bounds on resize
-      window.addEventListener("resize", () => {
+      this._onResize = () => {
         this.boundsWidth = document.documentElement.clientWidth - SPRITE_SIZE;
         this.boundsHeight = window.innerHeight - SPRITE_SIZE;
-      });
+      };
+      window.addEventListener("resize", this._onResize, { passive: true });
+
+      // Pause when tab is inactive to save CPU and battery
+      this._onVisibilityChange = () => {
+        if (!document.hidden) {
+          this.lastFrameTime = performance.now();
+        }
+      };
+      document.addEventListener("visibilitychange", this._onVisibilityChange);
 
       // Random starting position within viewport
       this.x = Math.random() * this.boundsWidth;
@@ -261,31 +271,44 @@
 
       // Animation loop
       this.running = false;
-      this.intervalId = null;
+      this.animationFrameId = null;
+      this.lastFrameTime = 0;
+      this.currentFrameIndex = -1;
+      this.lastRenderX = -9999;
+      this.lastRenderY = -9999;
     }
 
     start() {
       if (this.running) return;
       this.running = true;
+      this.lastFrameTime = performance.now();
 
-      // Calculate interval from FPS
-      // Higher FPS = smoother movement while maintaining same speed
-      const interval = 1000 / this.fps;
-      this.intervalId = setInterval(() => {
-        this.update();
-      }, interval);
+      const loop = (currentTime) => {
+        if (!this.running) return;
+        const delta = Math.min(100, Math.max(0, currentTime - (this.lastFrameTime || currentTime)));
+        this.lastFrameTime = currentTime;
+
+        if (!document.hidden && delta > 0) {
+          this.updateDelta(delta);
+        }
+
+        this.animationFrameId = requestAnimationFrame(loop);
+      };
+
+      this.animationFrameId = requestAnimationFrame(loop);
     }
 
     stop() {
       this.running = false;
-      if (this.intervalId) {
-        clearInterval(this.intervalId);
-        this.intervalId = null;
+      if (this.animationFrameId) {
+        cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
       }
     }
 
     setSprites(sprites) {
       this.spriteImages = sprites;
+      this.currentFrameIndex = -1;
       this.updateSprite();
     }
 
@@ -293,18 +316,16 @@
       if (this.spriteImages.length === 0) return;
 
       // Get the current animation frame index
-      // Uses tickCount which is scaled to match original 5 FPS timing
       let frameIndex;
       if (this.state === NekoState.SLEEP) {
-        // Slower animation for sleep (toggles every 4 ticks in original = 800ms)
-        frameIndex =
-          this.animationTable[this.state][(this.tickCount >> 2) & 0x1];
+        frameIndex = this.animationTable[this.state][(this.tickCount >> 2) & 0x1];
       } else {
-        // Normal animation speed (toggles every tick in original = 200ms)
         frameIndex = this.animationTable[this.state][this.tickCount & 0x1];
       }
 
-      // Update the image
+      if (this.currentFrameIndex === frameIndex) return;
+      this.currentFrameIndex = frameIndex;
+
       const img = this.element.querySelector("img");
       if (img && this.spriteImages[frameIndex]) {
         img.src = this.spriteImages[frameIndex];
@@ -312,36 +333,43 @@
     }
 
     updatePosition() {
-      this.element.style.left = Math.round(this.x) + "px";
-      this.element.style.top = Math.round(this.y) + "px";
+      const lx = Math.round(this.x);
+      const ly = Math.round(this.y);
+      if (lx !== this.lastRenderX || ly !== this.lastRenderY) {
+        this.lastRenderX = lx;
+        this.lastRenderY = ly;
+        this.element.style.left = lx + "px";
+        this.element.style.top = ly + "px";
+      }
     }
 
-    update() {
-      // Track time accumulator for original tick timing
-      // Original runs at 5 FPS (200ms per tick), we run at this.fps
-      // We need to accumulate fractional ticks and process when we hit a full tick
+    updateDelta(deltaMs) {
       if (this.tickAccumulator === undefined) this.tickAccumulator = 0;
 
       const originalFPS = 5;
-      this.tickAccumulator += originalFPS / this.fps;
+      this.tickAccumulator += (deltaMs / 1000) * originalFPS;
 
-      // Process as many original ticks as have accumulated
+      let ticked = false;
       while (this.tickAccumulator >= 1) {
         this.tickAccumulator -= 1;
-        // Save previous position before processing tick
         this.prevLogicX = this.logicX;
         this.prevLogicY = this.logicY;
         this.processOriginalTick();
+        ticked = true;
       }
 
-      // Smooth interpolation between logic positions
-      // tickAccumulator represents progress (0-1) towards next tick
-      const t = this.tickAccumulator;
+      const t = Math.min(1, Math.max(0, this.tickAccumulator));
       this.x = this.prevLogicX + (this.logicX - this.prevLogicX) * t;
       this.y = this.prevLogicY + (this.logicY - this.prevLogicY) * t;
 
-      // Update display position every frame
       this.updatePosition();
+      if (ticked || this.state === NekoState.SLEEP) {
+        this.updateSprite();
+      }
+    }
+
+    update() {
+      this.updateDelta(1000 / (this.fps || 60));
     }
 
     processOriginalTick() {
@@ -755,6 +783,16 @@
     }
 
     destroy() {
+      this.stop();
+      if (this._onMouseMove) {
+        document.removeEventListener("mousemove", this._onMouseMove);
+      }
+      if (this._onResize) {
+        window.removeEventListener("resize", this._onResize);
+      }
+      if (this._onVisibilityChange) {
+        document.removeEventListener("visibilitychange", this._onVisibilityChange);
+      }
       if (this.element && this.element.parentNode) {
         this.element.parentNode.removeChild(this.element);
       }

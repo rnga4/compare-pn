@@ -116,26 +116,14 @@ $('#pg').onchange=e=>{ const val = Math.max(1, Math.min(pages, parseInt(e.target
 $('#sz').onchange=()=>go(1);$('#apf').onchange=()=>go(1);$('#srt').onchange=()=>go(1);
 const ufEl=$('#uf');if(ufEl)ufEl.onchange=()=>go(1);
 $('#expList').onclick=()=>{
-  const q=$('#q').value.trim(),ap=$('#apf').value,uf=$('#uf')?.value||'';
-  fetch(`/api/list?page=1&size=10000&q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}&user_filter=${encodeURIComponent(uf)}`).then(r=>r.json()).then(j=>{
-    const rows=[['Barang','Company','PN','Urutan','Diupdate Oleh','Status Approve','Disetujui Oleh','Tanggal Approve']];
-    (j.items||[]).forEach(it=>{
-      const nm=(it.name||'').replace(/\n/g,' ');
-      const who=it.updated_by||it.created_by||'';
-      let apprDate='';
-      if(it.approved_at){
-        try{const d=new Date(it.approved_at); if(!isNaN(d.getTime())) apprDate=d.toLocaleString('id-ID');}catch(e){}
-      }
-      const appr=it.approved_by_name?`Disetujui oleh ${it.approved_by_name}`:'Belum di-approve';
-      (it.pns||[]).forEach(p=>{
-        rows.push([nm, p.company, p.pn, p.seq===0?'0':'1', who, appr, it.approved_by_name||'', apprDate]);
-      });
-    });
-    const csv=rows.map(r=>r.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}));
-    a.download='daftar-pn.csv';a.click();
-  });
+  const q=$('#q').value.trim(),ap=$('#apf').value,uf=$('#uf')?.value||'',srt=$('#srt')?.value||'name_asc';
+  const url=`/api/export/csv?q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}&user_filter=${encodeURIComponent(uf)}&sort=${encodeURIComponent(srt)}`;
+  toast.info('Menyiapkan file ekspor CSV...');
+  const a=document.createElement('a');
+  a.href=url;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 };
 $('#cpyAll').onclick=()=>{
   const list=[];
