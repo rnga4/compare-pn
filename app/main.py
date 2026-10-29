@@ -1468,30 +1468,34 @@ def admin_duplicates(request: Request):
     user = get_current_user(request)
     if not user or not user.get("is_admin"):
         return Response(status_code=403, content='{"error":"Akses khusus admin"}', media_type="application/json")
-    with conn() as c:
-        dup_names = c.execute("""
-            SELECT lower(name) AS norm_name, count(*) AS count,
-                   json_agg(json_build_object('id', id, 'name', name)) AS items
-            FROM items
-            WHERE name IS NOT NULL AND trim(name) <> ''
-            GROUP BY lower(name)
-            HAVING count(*) > 1
-            ORDER BY count DESC
-            LIMIT 50
-        """).fetchall()
+    try:
+        with conn() as c:
+            dup_names = c.execute("""
+                SELECT lower(name) AS norm_name, count(*) AS count,
+                       jsonb_agg(jsonb_build_object('id', id, 'name', name)) AS items
+                FROM items
+                WHERE name IS NOT NULL AND trim(name) <> ''
+                GROUP BY lower(name)
+                HAVING count(*) > 1
+                ORDER BY count DESC
+                LIMIT 50
+            """).fetchall()
 
-        dup_pns = c.execute("""
-            SELECT co.name AS company, p.pn_norm, count(DISTINCT p.item_id) AS item_count,
-                   json_agg(DISTINCT json_build_object('item_id', i.id, 'item_name', i.name, 'pn', p.pn)) AS occurrences
-            FROM part_numbers p
-            JOIN companies co ON co.id = p.company_id
-            JOIN items i ON i.id = p.item_id
-            GROUP BY co.name, p.pn_norm
-            HAVING count(DISTINCT p.item_id) > 1
-            ORDER BY count(DISTINCT p.item_id) DESC
-            LIMIT 50
-        """).fetchall()
-    return {"duplicate_names": dup_names, "duplicate_pns": dup_pns}
+            dup_pns = c.execute("""
+                SELECT co.name AS company, p.pn_norm, count(DISTINCT p.item_id) AS item_count,
+                       jsonb_agg(DISTINCT jsonb_build_object('item_id', i.id, 'item_name', i.name, 'pn', p.pn)) AS occurrences
+                FROM part_numbers p
+                JOIN companies co ON co.id = p.company_id
+                JOIN items i ON i.id = p.item_id
+                GROUP BY co.name, p.pn_norm
+                HAVING count(DISTINCT p.item_id) > 1
+                ORDER BY count(DISTINCT p.item_id) DESC
+                LIMIT 50
+            """).fetchall()
+        return {"duplicate_names": dup_names, "duplicate_pns": dup_pns}
+    except Exception as e:
+        logger.exception("Error analyzing duplicates: %s", e)
+        return Response(status_code=500, content=json.dumps({"error": f"Gagal menganalisis duplikat: {str(e)}"}), media_type="application/json")
 
 # --- BACKUP & RESTORE ---
 @app.get("/api/admin/backup")
