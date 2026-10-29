@@ -1379,8 +1379,25 @@ function chrome(){
     });
     if (activeRowTrigger) {
       activeRowTrigger.setAttribute('aria-expanded', 'false');
+      const trRow = activeRowTrigger.closest('tr');
+      if (trRow) trRow.classList.remove('row-act-active');
       activeRowTrigger = null;
     }
+    document.querySelectorAll('tr.row-act-active').forEach(tr => tr.classList.remove('row-act-active'));
+  };
+
+  const focusMenuItem = (menu, offset = 1) => {
+    if (!menu || menu.hidden) return;
+    const items = Array.from(menu.querySelectorAll('.menu-item:not([disabled])'));
+    if (!items.length) return;
+    const currentIdx = items.indexOf(document.activeElement);
+    let nextIdx;
+    if (currentIdx === -1) {
+      nextIdx = offset > 0 ? 0 : items.length - 1;
+    } else {
+      nextIdx = (currentIdx + offset + items.length) % items.length;
+    }
+    items[nextIdx]?.focus();
   };
 
   const positionRowMenu = (trigger) => {
@@ -1470,6 +1487,8 @@ function chrome(){
     menu.hidden = false;
     trigger.setAttribute('aria-expanded', 'true');
     activeRowTrigger = trigger;
+    const trRow = trigger.closest('tr');
+    if (trRow) trRow.classList.add('row-act-active');
 
     const rect = trigger.getBoundingClientRect();
     const menuWidth = 220;
@@ -1533,7 +1552,55 @@ function chrome(){
   });
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeAllMenus();
+    const rowMenu = $('#rowActionMenu');
+    const isRowMenuOpen = rowMenu && !rowMenu.hidden;
+
+    if (e.key === 'Escape') {
+      if (isRowMenuOpen && activeRowTrigger) {
+        const trg = activeRowTrigger;
+        closeAllMenus();
+        trg.focus();
+        e.preventDefault();
+        return;
+      }
+      closeAllMenus();
+      return;
+    }
+
+    // Keyboard trigger on row action button
+    const trg = e.target?.closest?.('.row-act-trigger');
+    if (trg) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (!isRowMenuOpen || activeRowTrigger !== trg) {
+          closeAllMenus();
+          positionRowMenu(trg);
+        }
+        focusMenuItem(rowMenu, e.key === 'ArrowUp' ? -1 : 1);
+        return;
+      }
+    }
+
+    // Arrow navigation inside rowActionMenu
+    if (isRowMenuOpen && (e.target?.closest?.('#rowActionMenu') || e.target === activeRowTrigger)) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        focusMenuItem(rowMenu, 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        focusMenuItem(rowMenu, -1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        const items = Array.from(rowMenu.querySelectorAll('.menu-item:not([disabled])'));
+        if (items.length) items[0].focus();
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        const items = Array.from(rowMenu.querySelectorAll('.menu-item:not([disabled])'));
+        if (items.length) items[items.length - 1].focus();
+      } else if (e.key === 'Tab') {
+        closeAllMenus();
+      }
+    }
   });
 
   window.addEventListener('resize', closeAllMenus);

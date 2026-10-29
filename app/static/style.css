@@ -236,6 +236,15 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
   transform: rotate(180deg);
 }
 
+tr.row-act-active td {
+  background: color-mix(in srgb, var(--ac) 9%, var(--card)) !important;
+  transition: background 0.15s ease;
+}
+
+body.dark tr.row-act-active td {
+  background: color-mix(in srgb, var(--ac) 16%, var(--card)) !important;
+}
+
 /* Compact action cluster */
 .compact-actions {
   display: inline-flex;
