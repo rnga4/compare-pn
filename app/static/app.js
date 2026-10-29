@@ -65,13 +65,14 @@ function cell(list,q,approved,approvedAt){
 }
 let CURRENT_SORT = 'name_asc';
 const headHtml=()=>{
-  const showExtra = document.body.dataset.page==='list' && !!CURRENT_USER;
+  const showAuthor = !!CURRENT_USER;
   let sortBadge = '';
   if(CURRENT_SORT === 'name_asc') sortBadge = ' <span class="sort-icon">A-Z</span>';
   else if(CURRENT_SORT === 'name_desc') sortBadge = ' <span class="sort-icon">Z-A</span>';
   return '<tr><th class="sortable-th" id="thBarang" title="Klik untuk mengurutkan Nama A-Z / Z-A">Barang' + sortBadge + '</th>' +
     COMPS.map(c=>`<th>${esc(c)}</th>`).join('') +
-    (showExtra?'<th class="author-th">Diupdate Oleh</th><th class="act-th">Aksi</th>':'') +
+    (showAuthor ? '<th class="author-th">Diupdate Oleh</th>' : '') +
+    '<th class="act-th">Aksi</th>' +
     '</tr>';
 };
 function rowCells(i,q,no){
@@ -83,26 +84,26 @@ function rowCells(i,q,no){
     :'<span class="mu">–</span>';
   const canEdit = CURRENT_USER && ((i.user_id == null) || (i.user_id == CURRENT_USER.id) || CURRENT_USER.is_admin);
   const isApproved = !!i.approved_by_name;
-  let apBtnTip = 'Kroscek & Approve';
-  if(isApproved){
-    try{
-      const d=new Date(i.approved_at);
-      if(!isNaN(d.getTime())) apBtnTip = `Disetujui oleh ${i.approved_by_name} • ${d.toLocaleString('id-ID')}`;
-      else apBtnTip = `Disetujui oleh ${i.approved_by_name}`;
-    }catch(e){ apBtnTip = `Disetujui oleh ${i.approved_by_name}`; }
-  }
-  const approveBtn = CURRENT_USER ? `<button class="btn sm ${isApproved?'ok':''}" data-approve="${i.id}" data-appr="${isApproved?'0':'1'}" title="${esc(apBtnTip)}">${isApproved?'Disetujui':'Approve'}</button>` : '';
-  const editBtn = (canEdit && !isApproved) ? `<button class="btn sm" data-edit="${i.id}" title="Edit">Edit</button>` : (canEdit && isApproved ? `<button class="btn sm" disabled title="Batalin approve dulu kalo mau edit">Edit</button>` : '');
-  const cloneBtn = CURRENT_USER ? `<button class="btn sm" data-clone="${i.id}" title="Duplikasi item ini sebagai data baru">Kloning</button>` : '';
-  const historyBtn = `<button class="btn sm" data-history="${i.id}" title="Riwayat perubahan barang">Riwayat</button>`;
-  const deleteBtn = (canEdit && !isApproved) ? `<button class="btn sm danger" data-delete="${i.id}" title="Hapus">Hapus</button>` : (canEdit && isApproved ? `<button class="btn sm danger" disabled title="Batalin approve dulu kalo mau hapus">Hapus</button>` : '');
+  const showAuthor = !!CURRENT_USER;
   const apprName = isApproved ? i.approved_by_name : '';
-  const showExtra = document.body.dataset.page==='list' && !!CURRENT_USER;
-  const actCol = showExtra ? `<td class="act-col" style="display:flex;gap:4px;flex-wrap:wrap">${approveBtn}${editBtn}${cloneBtn}${historyBtn}${deleteBtn}</td>` : '';
+  const rowMenuBtn = `<button type="button" class="btn sm row-act-trigger"
+         data-item-id="${i.id}"
+         data-item-name="${esc(i.name || '')}"
+         data-can-edit="${canEdit ? '1' : '0'}"
+         data-is-approved="${isApproved ? '1' : '0'}"
+         data-approved-by="${esc(i.approved_by_name || '')}"
+         data-approved-at="${esc(i.approved_at || '')}"
+         aria-haspopup="true"
+         aria-expanded="false"
+         title="Buka menu aksi barang ini">
+         <span>Aksi</span>
+         <span class="menu-arrow">▾</span>
+       </button>`;
+  const actCol = `<td class="act-col">${rowMenuBtn}</td>`;
   const nmCell = nm;
   return `<td class="nm">${no?`<span class="no">${no}</span>`:''}${nmCell}</td>`
     +COMPS.map(c=>`<td>${cell(m[c],q,apprName,i.approved_at)}</td>`).join('')
-    +(showExtra?`<td class="author-col">${author}</td>`:'')
+    +(showAuthor?`<td class="author-col">${author}</td>`:'')
     +actCol;
 }
 
@@ -889,6 +890,29 @@ function chrome(){
 
   document.body.insertAdjacentHTML('beforeend',`
   <datalist id="cl"></datalist><div id="toasts" popover="manual"></div>
+  <div id="rowActionMenu" class="menu-dropdown row-action-popup" hidden>
+    <button class="menu-item" id="rowActApprove" type="button">
+      <span class="menu-item-label" id="rowActApproveLabel">Approve</span>
+      <span class="menu-item-desc" id="rowActApproveDesc">Tandai kroscek selesai</span>
+    </button>
+    <button class="menu-item" id="rowActEdit" type="button">
+      <span class="menu-item-label" id="rowActEditLabel">Edit Barang</span>
+      <span class="menu-item-desc" id="rowActEditDesc">Ubah nama atau part number</span>
+    </button>
+    <button class="menu-item" id="rowActClone" type="button">
+      <span class="menu-item-label" id="rowActCloneLabel">Kloning Item</span>
+      <span class="menu-item-desc" id="rowActCloneDesc">Duplikasi data sebagai barang baru</span>
+    </button>
+    <button class="menu-item" id="rowActHistory" type="button">
+      <span class="menu-item-label" id="rowActHistoryLabel">Riwayat Perubahan</span>
+      <span class="menu-item-desc" id="rowActHistoryDesc">Lihat catatan versi &amp; revisi</span>
+    </button>
+    <div class="menu-sep" id="rowActSepDelete"></div>
+    <button class="menu-item menu-item-danger" id="rowActDelete" type="button">
+      <span class="menu-item-label" id="rowActDeleteLabel">Hapus Barang</span>
+      <span class="menu-item-desc" id="rowActDeleteDesc">Hapus permanen barang ini</span>
+    </button>
+  </div>
   <dialog id="dHelp">
     <div class="dh"><h3>Pintasan Keyboard</h3><button class="x" id="helpX" aria-label="Tutup">×</button></div>
     <table class="ks-table">
@@ -1346,55 +1370,174 @@ function chrome(){
   }
 
   // menu aksi dropdown handler
-  document.addEventListener('click',e=>{
-    const trigger=e.target.closest('.menu-trigger');
-    if(trigger){
+  let activeRowTrigger = null;
+  const closeAllMenus = () => {
+    document.querySelectorAll('.menu-dropdown').forEach(m => {
+      m.hidden = true;
+      const tr = m.closest('.menu-wrap')?.querySelector('.menu-trigger');
+      if (tr) tr.setAttribute('aria-expanded', 'false');
+    });
+    if (activeRowTrigger) {
+      activeRowTrigger.setAttribute('aria-expanded', 'false');
+      activeRowTrigger = null;
+    }
+  };
+
+  const positionRowMenu = (trigger) => {
+    const menu = $('#rowActionMenu');
+    if (!menu) return;
+
+    const itemId = trigger.dataset.itemId;
+    const canEdit = trigger.dataset.canEdit === '1';
+    const isApproved = trigger.dataset.isApproved === '1';
+    const approvedBy = trigger.dataset.approvedBy || '';
+
+    // Approve button
+    const bAppr = $('#rowActApprove');
+    const lAppr = $('#rowActApproveLabel');
+    const dAppr = $('#rowActApproveDesc');
+    if (bAppr) {
+      bAppr.dataset.approve = itemId;
+      bAppr.dataset.appr = isApproved ? '0' : '1';
+      bAppr.disabled = false;
+      if (isApproved) {
+        lAppr.textContent = 'Batal Approve';
+        dAppr.textContent = approvedBy ? `Disetujui oleh ${approvedBy}` : 'Cabut status persetujuan';
+        bAppr.title = 'Cabut status persetujuan barang ini';
+      } else {
+        lAppr.textContent = 'Approve';
+        dAppr.textContent = 'Tandai kroscek selesai';
+        bAppr.title = 'Setujui barang ini';
+      }
+    }
+
+    // Edit button
+    const bEdit = $('#rowActEdit');
+    const dEdit = $('#rowActEditDesc');
+    if (bEdit) {
+      bEdit.dataset.edit = itemId;
+      if (CURRENT_USER && !canEdit) {
+        bEdit.disabled = true;
+        dEdit.textContent = 'Hanya pembuat atau admin';
+        bEdit.title = 'Hanya pembuat atau admin yang dapat mengedit';
+      } else if (isApproved) {
+        bEdit.disabled = true;
+        dEdit.textContent = 'Batalkan approve untuk edit';
+        bEdit.title = 'Barang sudah disetujui. Batal approve terlebih dahulu';
+      } else {
+        bEdit.disabled = false;
+        dEdit.textContent = 'Ubah nama atau part number';
+        bEdit.title = 'Edit data barang';
+      }
+    }
+
+    // Clone button
+    const bClone = $('#rowActClone');
+    if (bClone) {
+      bClone.dataset.clone = itemId;
+      bClone.disabled = false;
+      bClone.title = 'Duplikasi data barang sebagai entri baru';
+    }
+
+    // History button
+    const bHist = $('#rowActHistory');
+    if (bHist) {
+      bHist.dataset.history = itemId;
+      bHist.disabled = false;
+      bHist.title = 'Lihat log riwayat perubahan barang ini';
+    }
+
+    // Delete button
+    const bDel = $('#rowActDelete');
+    const dDel = $('#rowActDeleteDesc');
+    if (bDel) {
+      bDel.dataset.delete = itemId;
+      if (CURRENT_USER && !canEdit) {
+        bDel.disabled = true;
+        dDel.textContent = 'Hanya pembuat atau admin';
+        bDel.title = 'Hanya pembuat atau admin yang dapat menghapus';
+      } else if (isApproved) {
+        bDel.disabled = true;
+        dDel.textContent = 'Batalkan approve untuk hapus';
+        bDel.title = 'Barang sudah disetujui. Batal approve terlebih dahulu';
+      } else {
+        bDel.disabled = false;
+        dDel.textContent = 'Hapus permanen barang ini';
+        bDel.title = 'Hapus permanen barang ini';
+      }
+    }
+
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    activeRowTrigger = trigger;
+
+    const rect = trigger.getBoundingClientRect();
+    const menuWidth = menu.offsetWidth || 230;
+    const menuHeight = menu.offsetHeight || 250;
+
+    let left = rect.right - menuWidth;
+    if (left < 10) left = Math.max(10, rect.left);
+    if (left + menuWidth > window.innerWidth - 10) {
+      left = window.innerWidth - menuWidth - 10;
+    }
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    let top;
+    if (spaceBelow < menuHeight + 10 && spaceAbove > spaceBelow) {
+      top = Math.max(10, rect.top - menuHeight - 6);
+    } else {
+      top = rect.bottom + 6;
+    }
+
+    menu.style.position = 'fixed';
+    menu.style.top = `${Math.round(top)}px`;
+    menu.style.left = `${Math.round(left)}px`;
+  };
+
+  document.addEventListener('click', e => {
+    const rowTrigger = e.target.closest('.row-act-trigger');
+    if (rowTrigger) {
       e.stopPropagation();
-      const wrap=trigger.closest('.menu-wrap');
-      const menu=wrap?wrap.querySelector('.menu-dropdown'):null;
-      if(menu){
-        const isHidden=menu.hidden;
-        document.querySelectorAll('.menu-dropdown').forEach(m=>{
-          m.hidden=true;
-          const tr=m.closest('.menu-wrap')?.querySelector('.menu-trigger');
-          if(tr)tr.setAttribute('aria-expanded','false');
-        });
-        menu.hidden=!isHidden;
-        trigger.setAttribute('aria-expanded',String(isHidden));
+      if (activeRowTrigger === rowTrigger) {
+        closeAllMenus();
+        return;
+      }
+      closeAllMenus();
+      positionRowMenu(rowTrigger);
+      return;
+    }
+
+    const trigger = e.target.closest('.menu-trigger');
+    if (trigger) {
+      e.stopPropagation();
+      const wrap = trigger.closest('.menu-wrap');
+      const menu = wrap ? wrap.querySelector('.menu-dropdown') : null;
+      if (menu) {
+        const isHidden = menu.hidden;
+        closeAllMenus();
+        menu.hidden = !isHidden;
+        trigger.setAttribute('aria-expanded', String(isHidden));
       }
       return;
     }
 
-    if(!e.target.closest('.menu-dropdown')){
-      document.querySelectorAll('.menu-dropdown').forEach(m=>{
-        m.hidden=true;
-        const tr=m.closest('.menu-wrap')?.querySelector('.menu-trigger');
-        if(tr)tr.setAttribute('aria-expanded','false');
-      });
-    }else{
-      const item=e.target.closest('.menu-item');
-      if(item&&item.id!=='dn'){
-        setTimeout(()=>{
-          const m=item.closest('.menu-dropdown');
-          if(m){
-            m.hidden=true;
-            const tr=m.closest('.menu-wrap')?.querySelector('.menu-trigger');
-            if(tr)tr.setAttribute('aria-expanded','false');
-          }
-        },80);
+    if (!e.target.closest('.menu-dropdown')) {
+      closeAllMenus();
+    } else {
+      const item = e.target.closest('.menu-item');
+      if (item && item.id !== 'dn') {
+        setTimeout(closeAllMenus, 80);
       }
     }
   });
 
-  document.addEventListener('keydown',e=>{
-    if(e.key==='Escape'){
-      document.querySelectorAll('.menu-dropdown').forEach(m=>{
-        m.hidden=true;
-        const tr=m.closest('.menu-wrap')?.querySelector('.menu-trigger');
-        if(tr)tr.setAttribute('aria-expanded','false');
-      });
-    }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAllMenus();
   });
+
+  window.addEventListener('resize', closeAllMenus);
+  window.addEventListener('scroll', closeAllMenus, true);
 
   // --- edit dialog
   let editId=null;
@@ -1523,6 +1666,7 @@ function chrome(){
     if(cb){
       e.preventDefault();
       if(cb.disabled)return;
+      if(!CURRENT_USER){openAuth('Silakan masuk atau daftar terlebih dahulu untuk kloning data PN.');return;}
       cloneItem(cb.dataset.clone);
       return;
     }
@@ -1562,6 +1706,7 @@ function chrome(){
     if(db){
       e.preventDefault();
       if(db.disabled)return;
+      if(!CURRENT_USER){openAuth('Silakan masuk untuk menghapus data PN.');return;}
       const id=db.dataset.delete;
       const ok = await confirmDialog({
         title: 'Hapus Barang Ini?',

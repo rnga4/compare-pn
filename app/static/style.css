@@ -159,6 +159,68 @@ kbd{font:12px ui-monospace,monospace;border:1px solid var(--bd);border-bottom-wi
   margin: 4px 6px;
 }
 
+.row-action-popup {
+  position: fixed !important;
+  z-index: 9999 !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22), 0 3px 10px rgba(0, 0, 0, 0.1);
+  min-width: 220px;
+}
+
+.menu-item-danger {
+  color: #ef4444 !important;
+}
+
+.menu-item-danger:hover, .menu-item-danger:focus-visible {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #dc2626 !important;
+}
+
+.menu-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: auto;
+}
+
+.act-col {
+  text-align: center;
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
+  vertical-align: middle;
+}
+
+.act-th {
+  text-align: center;
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
+}
+
+.row-act-trigger {
+  padding: 4px 10px;
+  font-size: 12.5px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.row-act-trigger .menu-arrow {
+  font-size: 10px;
+  opacity: 0.7;
+  transition: transform 0.16s ease;
+}
+
+.row-act-trigger[aria-expanded="true"] {
+  background: var(--hd);
+  border-color: var(--ac);
+  color: var(--ac);
+}
+
+.row-act-trigger[aria-expanded="true"] .menu-arrow {
+  transform: rotate(180deg);
+}
+
 /* Compact action cluster */
 .compact-actions {
   display: inline-flex;
