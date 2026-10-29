@@ -42,25 +42,14 @@ function copyText(t, el, msg='Disalin'){
 }
 document.addEventListener('click',e=>{const p=e.target.closest('.pn');if(p)copyText(p.dataset.pn, p)});
 
-function cell(list,q,approved,approvedAt){
+function cell(list,q){
   if(!list||!list.length)return '<span class="mu">–</span>';
   const qn=norm(q);
-  let apTip='';
-  if(approved){
-    if(approvedAt){
-      try{
-        const d=new Date(approvedAt);
-        if(!isNaN(d.getTime())) apTip = `Disetujui oleh ${approved} • ${d.toLocaleString('id-ID')}`;
-      }catch(e){}
-    }
-    if(!apTip) apTip = `Disetujui oleh ${approved}`;
-  }
   return list.map(p=>{
     const hit=qn&&norm(p.pn).includes(qn)?' hit':'';
-    const chk = approved ? `<span class="ap-chk" title="${esc(apTip)}">✓</span>` : '';
     return p.seq===0
-      ?`<span class="pnwrap"><button type="button" class="pn main${hit}" data-pn="${esc(p.pn)}" title="Klik untuk salin" aria-label="Salin PN ${esc(p.pn)}">${esc(p.pn)}</button>${chk}</span>`
-      :`<span class="pnwrap"><button type="button" class="pn rep${hit}" data-pn="${esc(p.pn)}" title="Pengganti ${p.seq} · klik untuk salin" aria-label="Salin PN pengganti ${esc(p.pn)}">↳ ${esc(p.pn)}</button>${chk}</span>`;
+      ?`<button type="button" class="pn main${hit}" data-pn="${esc(p.pn)}" title="Klik untuk salin" aria-label="Salin PN ${esc(p.pn)}">${esc(p.pn)}</button>`
+      :`<button type="button" class="pn rep${hit}" data-pn="${esc(p.pn)}" title="Pengganti ${p.seq} · klik untuk salin" aria-label="Salin PN pengganti ${esc(p.pn)}">↳ ${esc(p.pn)}</button>`;
   }).join('');
 }
 let CURRENT_SORT = 'name_asc';
@@ -85,7 +74,19 @@ function rowCells(i,q,no){
   const canEdit = CURRENT_USER && ((i.user_id == null) || (i.user_id == CURRENT_USER.id) || CURRENT_USER.is_admin);
   const isApproved = !!i.approved_by_name;
   const showAuthor = !!CURRENT_USER;
-  const apprName = isApproved ? i.approved_by_name : '';
+
+  let apTip = '';
+  if (isApproved) {
+    if (i.approved_at) {
+      try {
+        const d = new Date(i.approved_at);
+        if (!isNaN(d.getTime())) apTip = `Disetujui oleh ${i.approved_by_name} • ${d.toLocaleString('id-ID')}`;
+      } catch(e) {}
+    }
+    if (!apTip) apTip = `Disetujui oleh ${i.approved_by_name}`;
+  }
+  const chk = isApproved ? `<span class="ap-chk" title="${esc(apTip)}" aria-label="${esc(apTip)}">✓</span>` : '';
+
   const rowMenuBtn = `<button type="button" class="btn sm row-act-trigger"
          data-item-id="${i.id}"
          data-item-name="${esc(i.name || '')}"
@@ -99,10 +100,10 @@ function rowCells(i,q,no){
          <span>Aksi</span>
          <span class="menu-arrow">▾</span>
        </button>`;
-  const actCol = `<td class="act-col">${rowMenuBtn}</td>`;
+  const actCol = `<td class="act-col"><div class="act-cell-wrap">${chk}${rowMenuBtn}</div></td>`;
   const nmCell = nm;
   return `<td class="nm">${no?`<span class="no">${no}</span>`:''}${nmCell}</td>`
-    +COMPS.map(c=>`<td>${cell(m[c],q,apprName,i.approved_at)}</td>`).join('')
+    +COMPS.map(c=>`<td>${cell(m[c],q)}</td>`).join('')
     +(showAuthor?`<td class="author-col">${author}</td>`:'')
     +actCol;
 }
