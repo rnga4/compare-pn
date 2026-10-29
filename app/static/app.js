@@ -399,11 +399,11 @@ async function loadAdminUsers(){
       }
       const isSelf = CURRENT_USER && (CURRENT_USER.id === u.id);
       const actionHtml = isSelf 
-        ? `<div style="display:inline-flex;align-items:center;gap:6px">
+        ? `<div class="admin-user-acts">
              <span class="mu" style="font-size:11px">(Akun Anda)</span>
              <button class="btn sm danger" data-delete-user="${u.id}" data-username="${esc(u.username)}" data-is-self="1" title="Hapus akun Anda sendiri">Hapus Akun</button>
            </div>`
-        : `<div style="display:inline-flex;align-items:center;gap:6px">
+        : `<div class="admin-user-acts">
              <button class="btn sm" data-toggle-admin="${u.id}" data-current="${u.is_admin ? '1':'0'}" title="${u.is_admin ? 'Ubah role jadi Member' : 'Ubah role jadi Admin'}">${u.is_admin ? 'Jadikan Member' : 'Jadikan Admin'}</button>
              <button class="btn sm danger" data-delete-user="${u.id}" data-username="${esc(u.username)}" data-is-self="0" title="Hapus akun pengguna ${esc(u.username)}">Hapus Akun</button>
            </div>`;
