@@ -1374,16 +1374,20 @@ body.theme-cyberpunk .btn.pri.btn-success {
   background: var(--hd);
 }
 
-/* Admin Dashboard Modal */
+/* Admin Dashboard Modal: Static Stable Dimensions */
 #dAdmin {
-  max-width: 1040px;
-  width: 95vw;
-  max-height: 88vh;
+  width: min(1080px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+  min-width: min(1080px, calc(100vw - 28px));
+  height: min(840px, calc(100vh - 36px));
+  min-height: min(600px, calc(100vh - 36px));
+  max-height: calc(100vh - 36px);
   padding: 0;
   border-radius: 16px;
   border: 1px solid var(--bd);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
   overflow: hidden;
+  box-sizing: border-box;
 }
 #dAdmin[open] {
   display: flex;
@@ -1399,6 +1403,7 @@ body.theme-cyberpunk .btn.pri.btn-success {
   align-items: center;
   justify-content: space-between;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 .admin-content {
   padding: 18px 22px;
@@ -1407,6 +1412,8 @@ body.theme-cyberpunk .btn.pri.btn-success {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
+  box-sizing: border-box;
 }
 .admin-header-title {
   display: inline-flex;
@@ -1466,6 +1473,7 @@ body.theme-cyberpunk .btn.pri.btn-success {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
+  flex-shrink: 0;
 }
 @media (max-width: 860px) {
   .admin-kpi-grid {
@@ -1532,6 +1540,7 @@ body.theme-cyberpunk .btn.pri.btn-success {
   scrollbar-width: none;
   box-sizing: border-box;
   margin-top: 0;
+  flex-shrink: 0;
 }
 .admin-tabs::-webkit-scrollbar {
   display: none;
@@ -1576,14 +1585,25 @@ body.dark .admin-tab-btn.active {
 }
 .admin-panel-tab.active {
   display: flex;
+  flex: 1;
+  min-height: 0;
 }
 .admin-panel-tab .tw {
   border: 1px solid var(--bd);
   border-radius: 10px;
   overflow: auto;
   background: var(--card);
-  max-height: 400px;
+  flex: 1;
+  min-height: 260px;
+  max-height: none !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+.admin-panel-tab .dup-container {
+  flex: 1;
+  min-height: 260px;
+  max-height: none !important;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 .admin-panel-tab table {
   width: 100%;
@@ -1600,6 +1620,9 @@ body.dark .admin-tab-btn.active {
   border-bottom: 1px solid var(--bd);
   vertical-align: middle;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 .admin-panel-tab tbody td {
   padding: 9px 14px;

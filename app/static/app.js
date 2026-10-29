@@ -1053,7 +1053,7 @@ function chrome(){
           <button class="btn sm" id="bExportLogs">Export CSV</button>
           <button class="btn sm" id="bRefreshLogs">Refresh</button>
         </div>
-        <div class="tw" style="max-height:360px">
+        <div class="tw">
           <table>
             <thead>
               <tr>
@@ -1078,7 +1078,7 @@ function chrome(){
           <button class="btn sm pri" id="bMergeComp">Gabung Perusahaan</button>
           <button class="btn sm" id="bRefreshComp">Refresh</button>
         </div>
-        <div class="tw" style="max-height:360px">
+        <div class="tw">
           <table>
             <thead>
               <tr><th>ID</th><th>Nama Perusahaan</th><th>Total PN</th><th>Total Barang</th><th>Aksi</th></tr>
@@ -1095,7 +1095,7 @@ function chrome(){
           <span class="sp"></span>
           <button class="btn sm" id="bRefreshDups">Periksa Ulang</button>
         </div>
-        <div id="adminDuplicatesContainer" class="dup-container" style="max-height:380px;overflow-y:auto;padding-right:4px"></div>
+        <div id="adminDuplicatesContainer" class="dup-container"></div>
       </div>
 
       <!-- Tab 6: Backup & Restore -->
