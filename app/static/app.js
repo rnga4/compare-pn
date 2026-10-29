@@ -128,7 +128,7 @@ function renderNavAuth(){
   const adminBtn = (CURRENT_USER && CURRENT_USER.is_admin) 
     ? '<button class="btn sm" id="bAdmin" title="Buka Admin Panel &amp; Log">Admin</button>' 
     : '';
-  const helpBtn = '<button class="btn sm" id="bHelp" title="Pintasan Keyboard (?)" style="padding:0 8px;font-weight:700">?</button>';
+  const helpBtn = '<button class="btn sm nav-help-btn" id="bHelp" title="Pintasan Keyboard (?)" aria-label="Bantuan dan Pintasan Keyboard">?</button>';
   if(CURRENT_USER){
     el.innerHTML=`${adminBtn}<span class="user-pill" title="Login sebagai ${esc(CURRENT_USER.username)}"><b>${esc(CURRENT_USER.username)}</b>${CURRENT_USER.is_admin?' <span class="badge-admin">Admin</span>':''}</span><button class="btn sm" id="bLogout">Keluar</button>${helpBtn}`;
     const bLo=$('#bLogout');
@@ -830,13 +830,35 @@ function chrome(){
   let cur='';try{cur=localStorage.getItem('cmp-theme')||'';}catch(e){}
   applyTheme(cur);
   const themes=[['','Light'],['dark','Dark'],['theme-sakura','Sakura'],['theme-bamboo','Bamboo'],['theme-cyberpunk','Cyberpunk'],['theme-mingyu','Mingyu'],['theme-ocean','Ocean'],['theme-retrolight','Retrolight']];
-  $('#nav').innerHTML='<a class="brand" href="/"><span class="logo">PN</span><span class="t">Compare PN</span></a>'+
-    '<nav><a href="/" class="'+(pg==='search'?'on':'')+'">Cari</a><a href="/list" class="'+(pg==='list'?'on':'')+'">Daftar</a></nav>'+
-    '<span class="sp"></span><span class="mu" id="stats"></span>'+
-    '<span id="navAuth" style="display:inline-flex;align-items:center;gap:8px"></span>'+
-    '<select class="btn sm" id="thm" style="min-width:110px">'+themes.map(([v,l])=>'<option value="'+v+'" '+(cur===v?'selected':'')+'>'+l+'</option>').join('')+'</select>'+
-    '<button class="btn sm" id="bNeko" title="Toggle pet kucing Neko">Neko</button>'+
-    '<button class="btn sm" id="bImp">Import</button><button class="btn sm pri" id="bAdd">+ Tambah</button>';
+  $('#nav').innerHTML=
+    '<div class="nav-left">'+
+      '<a class="brand" href="/" title="Compare PN">'+
+        '<span class="logo">PN</span>'+
+        '<span class="t">Compare PN</span>'+
+      '</a>'+
+      '<nav class="nav-pills">'+
+        '<a href="/" class="'+(pg==='search'?'on':'')+'">Cari</a>'+
+        '<a href="/list" class="'+(pg==='list'?'on':'')+'">Daftar</a>'+
+      '</nav>'+
+    '</div>'+
+    '<div class="nav-center">'+
+      '<span class="nav-stats mu" id="stats"></span>'+
+    '</div>'+
+    '<div class="nav-right">'+
+      '<div id="navAuth" class="nav-group"></div>'+
+      '<span class="nav-sep" aria-hidden="true"></span>'+
+      '<div class="nav-group nav-tools">'+
+        '<select class="btn sm nav-select" id="thm" title="Ganti Tema">'+
+          themes.map(([v,l])=>'<option value="'+v+'" '+(cur===v?'selected':'')+'>'+l+'</option>').join('')+
+        '</select>'+
+        '<button class="btn sm nav-tool-btn" id="bNeko" title="Toggle pet kucing Neko">Neko</button>'+
+      '</div>'+
+      '<span class="nav-sep" aria-hidden="true"></span>'+
+      '<div class="nav-group nav-actions">'+
+        '<button class="btn sm" id="bImp" title="Import file Excel / CSV">Import</button>'+
+        '<button class="btn sm pri" id="bAdd" title="Tambah data barang manual">+ Tambah</button>'+
+      '</div>'+
+    '</div>';
   renderNavAuth();
   const th=$('#thm');
   if(th){
