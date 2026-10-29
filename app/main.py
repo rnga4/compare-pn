@@ -840,13 +840,14 @@ def approve_item(item_id: int, body: ApproveBody, request: Request):
     return res
 
 @app.get("/api/list")
-def api_list(request: Request, page: int = 1, size: int = 50, q: str = "", approved: str = "", user_filter: str = "", sort: str = "name_asc"):
+def api_list(request: Request, page: int = 1, size: int = 50, q: str = "", approved: str = "", user_filter: str = "", sort: str = "name_asc", completeness: str = ""):
     size = max(1, min(size, 10000))
     page = max(1, page)
     q = (q or "").strip()
     approved = (approved or "").strip()
     user_filter = (user_filter or "").strip()
     sort = (sort or "name_asc").strip().lower()
+    completeness = (completeness or "").strip().lower()
     offset = (page - 1) * size
 
     if sort == "name_desc":
@@ -871,6 +872,23 @@ def api_list(request: Request, page: int = 1, size: int = 50, q: str = "", appro
             extra_filters.append("i.approved_by IS NOT NULL")
         elif approved == "0":
             extra_filters.append("i.approved_by IS NULL")
+
+        if completeness == "single":
+            extra_filters.append("(SELECT count(DISTINCT pn.company_id) FROM part_numbers pn WHERE pn.item_id = i.id) = 1")
+        elif completeness == "multi":
+            extra_filters.append("(SELECT count(DISTINCT pn.company_id) FROM part_numbers pn WHERE pn.item_id = i.id) >= 2")
+        elif completeness.startswith("only:"):
+            cname = completeness.split(":", 1)[1].strip()
+            if cname:
+                extra_filters.append("""
+                    EXISTS (
+                        SELECT 1 FROM part_numbers pn
+                        JOIN companies co ON co.id = pn.company_id
+                        WHERE pn.item_id = i.id AND lower(co.name) = lower(%(only_cname)s)
+                    )
+                    AND (SELECT count(DISTINCT pn.company_id) FROM part_numbers pn WHERE pn.item_id = i.id) = 1
+                """)
+                extra_params["only_cname"] = cname
 
         if user_filter == "me":
             cur_u = get_current_user(request)
@@ -961,11 +979,12 @@ def api_list(request: Request, page: int = 1, size: int = 50, q: str = "", appro
     return {"total": total, "page": page, "size": size, "items": rows, "pending": pending}
 
 @app.get("/api/export/csv")
-def export_csv(request: Request, q: str = "", approved: str = "", user_filter: str = "", sort: str = "name_asc"):
+def export_csv(request: Request, q: str = "", approved: str = "", user_filter: str = "", sort: str = "name_asc", completeness: str = ""):
     q = (q or "").strip()
     approved = (approved or "").strip()
     user_filter = (user_filter or "").strip()
     sort = (sort or "name_asc").strip().lower()
+    completeness = (completeness or "").strip().lower()
 
     if sort == "name_desc":
         order_clause = "CASE WHEN i.name IS NULL OR trim(i.name) = '' THEN 1 ELSE 0 END, lower(i.name) DESC, i.id DESC"
@@ -982,6 +1001,23 @@ def export_csv(request: Request, q: str = "", approved: str = "", user_filter: s
         extra_filters.append("i.approved_by IS NOT NULL")
     elif approved == "0":
         extra_filters.append("i.approved_by IS NULL")
+
+    if completeness == "single":
+        extra_filters.append("(SELECT count(DISTINCT pn.company_id) FROM part_numbers pn WHERE pn.item_id = i.id) = 1")
+    elif completeness == "multi":
+        extra_filters.append("(SELECT count(DISTINCT pn.company_id) FROM part_numbers pn WHERE pn.item_id = i.id) >= 2")
+    elif completeness.startswith("only:"):
+        cname = completeness.split(":", 1)[1].strip()
+        if cname:
+            extra_filters.append("""
+                EXISTS (
+                    SELECT 1 FROM part_numbers pn
+                    JOIN companies co ON co.id = pn.company_id
+                    WHERE pn.item_id = i.id AND lower(co.name) = lower(%(only_cname)s)
+                )
+                AND (SELECT count(DISTINCT pn.company_id) FROM part_numbers pn WHERE pn.item_id = i.id) = 1
+            """)
+            extra_params["only_cname"] = cname
 
     if user_filter == "me":
         cur_u = get_current_user(request)

@@ -21,6 +21,11 @@
       <button class="qc" id="qc" hidden aria-label="Hapus filter" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)">×</button>
     </div>
     <select id="apf"><option value="">Semua status</option><option value="0">Belum di-approve</option><option value="1">Sudah di-approve</option></select>
+    <select id="cf" title="Filter Kelengkapan Part Number">
+      <option value="">Semua kelengkapan</option>
+      <option value="single">Hanya 1 company (Belum lengkap)</option>
+      <option value="multi">Lengkap (&ge; 2 company)</option>
+    </select>
     <select id="uf"><option value="">Semua pembuat</option><option value="me">Hanya data saya</option></select>
     <select id="srt" title="Urutan Data">
       <option value="name_asc" selected>Sort: Nama (A - Z)</option>
@@ -83,9 +88,9 @@ function clearFilter(){
 }
 async function go(p){
   page=Math.max(1,p||1);
-  const size=$('#sz').value,q=$('#q').value.trim(),ap=$('#apf').value,uf=$('#uf')?.value||'',srt=$('#srt')?.value||'name_asc';
+  const size=$('#sz').value,q=$('#q').value.trim(),ap=$('#apf').value,cf=$('#cf')?.value||'',uf=$('#uf')?.value||'',srt=$('#srt')?.value||'name_asc';
   CURRENT_SORT = srt;
-  try{localStorage.setItem('cmp_list_sz',size);localStorage.setItem('cmp_list_ap',ap);localStorage.setItem('cmp_list_uf',uf);localStorage.setItem('cmp_list_srt',srt);}catch(e){}
+  try{localStorage.setItem('cmp_list_sz',size);localStorage.setItem('cmp_list_ap',ap);localStorage.setItem('cmp_list_cf',cf);localStorage.setItem('cmp_list_uf',uf);localStorage.setItem('cmp_list_srt',srt);}catch(e){}
 
   // Skeleton shimmer placeholder
   $('#head').innerHTML=typeof headHtml==='function'?headHtml():'';
@@ -93,10 +98,10 @@ async function go(p){
   $('#tw').hidden=false;
   $('#empty').innerHTML='';
 
-  const r=await jget(`/api/list?page=${page}&size=${size}&q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}&user_filter=${encodeURIComponent(uf)}&sort=${encodeURIComponent(srt)}`);
+  const r=await jget(`/api/list?page=${page}&size=${size}&q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}&completeness=${encodeURIComponent(cf)}&user_filter=${encodeURIComponent(uf)}&sort=${encodeURIComponent(srt)}`);
   pages=Math.max(1,Math.ceil(r.total/r.size));
   if(page>pages)return go(pages);
-  history.replaceState(null,'',`?page=${page}&size=${size}`+(q?'&q='+encodeURIComponent(q):'')+(ap?'&approved='+encodeURIComponent(ap):'')+(uf?'&user_filter='+encodeURIComponent(uf):'')+(srt&&srt!=='name_asc'?'&sort='+encodeURIComponent(srt):''));
+  history.replaceState(null,'',`?page=${page}&size=${size}`+(q?'&q='+encodeURIComponent(q):'')+(ap?'&approved='+encodeURIComponent(ap):'')+(cf?'&completeness='+encodeURIComponent(cf):'')+(uf?'&user_filter='+encodeURIComponent(uf):'')+(srt&&srt!=='name_asc'?'&sort='+encodeURIComponent(srt):''));
 
   const pb=$('#pendBadge');
   if(pb){
@@ -137,15 +142,15 @@ async function go(p){
 }
 $('#pv').onclick=()=>go(page-1);$('#nx').onclick=()=>go(page+1);
 $('#pg').onchange=e=>{ const val = Math.max(1, Math.min(pages, parseInt(e.target.value, 10) || 1)); e.target.value = val; go(val); };
-$('#sz').onchange=()=>go(1);$('#apf').onchange=()=>go(1);$('#srt').onchange=()=>go(1);
+$('#sz').onchange=()=>go(1);$('#apf').onchange=()=>go(1);$('#cf').onchange=()=>go(1);$('#srt').onchange=()=>go(1);
 const ufEl=$('#uf');if(ufEl)ufEl.onchange=()=>go(1);
 $('#expList').onclick=()=>{
   if(!document.querySelector('#body .pn')){
     toast.info('Tidak ada data untuk diekspor');
     return;
   }
-  const q=$('#q').value.trim(),ap=$('#apf').value,uf=$('#uf')?.value||'',srt=$('#srt')?.value||'name_asc';
-  const url=`/api/export/csv?q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}&user_filter=${encodeURIComponent(uf)}&sort=${encodeURIComponent(srt)}`;
+  const q=$('#q').value.trim(),ap=$('#apf').value,cf=$('#cf')?.value||'',uf=$('#uf')?.value||'',srt=$('#srt')?.value||'name_asc';
+  const url=`/api/export/csv?q=${encodeURIComponent(q)}&approved=${encodeURIComponent(ap)}&completeness=${encodeURIComponent(cf)}&user_filter=${encodeURIComponent(uf)}&sort=${encodeURIComponent(srt)}`;
   toast.info('Menyiapkan file ekspor CSV...');
   const a=document.createElement('a');
   a.href=url;
@@ -192,6 +197,24 @@ boot().then(()=>{
   if(P.get('size'))$('#sz').value=P.get('size');
   try{if(!P.get('approved')&&localStorage.getItem('cmp_list_ap')!==null)$('#apf').value=localStorage.getItem('cmp_list_ap');}catch(e){}
   if(P.get('approved'))$('#apf').value=P.get('approved');
+  try{if(!P.get('completeness')&&localStorage.getItem('cmp_list_cf'))$('#cf').value=localStorage.getItem('cmp_list_cf');}catch(e){}
+  if(P.get('completeness'))$('#cf').value=P.get('completeness');
+
+  const cfEl = $('#cf');
+  if(cfEl && Array.isArray(COMPS) && COMPS.length > 0){
+    const grp = document.createElement('optgroup');
+    grp.label = 'Hanya di satu company spesifik:';
+    COMPS.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = `only:${c}`;
+      opt.textContent = `Hanya ada di ${c}`;
+      grp.appendChild(opt);
+    });
+    cfEl.appendChild(grp);
+    if(P.get('completeness')) cfEl.value = P.get('completeness');
+    else if(localStorage.getItem('cmp_list_cf')) cfEl.value = localStorage.getItem('cmp_list_cf');
+  }
+
   try{if(!P.get('user_filter')&&localStorage.getItem('cmp_list_uf'))$('#uf').value=localStorage.getItem('cmp_list_uf');}catch(e){}
   if(P.get('user_filter'))$('#uf').value=P.get('user_filter');
   try{if(!P.get('sort')&&localStorage.getItem('cmp_list_srt'))$('#srt').value=localStorage.getItem('cmp_list_srt');}catch(e){}
