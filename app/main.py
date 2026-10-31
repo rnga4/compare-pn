@@ -1,6 +1,8 @@
-import csv, io, os, re, time, secrets, hashlib, json
+import csv, io, os, re, time, secrets, hashlib, json, logging
 from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager, asynccontextmanager
+
+logger = logging.getLogger("compare-pn")
 import psycopg
 from psycopg.rows import dict_row
 from fastapi import FastAPI, UploadFile, File, Query, Request, Response
@@ -23,8 +25,6 @@ async def lifespan(app: FastAPI):
         pool = None
     with conn() as c, c.transaction():
         c.execute(SCHEMA)
-        # make sure rangga is admin
-        c.execute("UPDATE users SET is_admin = true WHERE lower(username) = 'rangga'")
         # promote first registered user to admin if none exists
         c.execute("""
             UPDATE users SET is_admin = true
@@ -294,6 +294,36 @@ def companies():
         _COMPS_CACHE["ts"] = now
         return data
 
+@app.get("/api/suggest/names")
+def suggest_names(q: str = ""):
+    query = q.strip()
+    with conn() as c:
+        if not query:
+            rows = c.execute("""
+                SELECT name
+                FROM (
+                    SELECT DISTINCT name
+                    FROM items
+                    WHERE name IS NOT NULL AND trim(name) <> ''
+                ) sub
+                ORDER BY name
+                LIMIT 20
+            """).fetchall()
+            return [r["name"] for r in rows]
+        rows = c.execute("""
+            SELECT name
+            FROM (
+                SELECT DISTINCT name
+                FROM items
+                WHERE name IS NOT NULL AND trim(name) <> '' AND name ILIKE %s
+            ) sub
+            ORDER BY
+                CASE WHEN name ILIKE %s THEN 0 ELSE 1 END,
+                name
+            LIMIT 20
+        """, (f"%{query}%", f"{query}%")).fetchall()
+        return [r["name"] for r in rows]
+
 @app.get("/api/stats")
 def stats():
     now = time.time()
@@ -310,6 +340,13 @@ def stats():
 class AuthBody(BaseModel):
     username: str
     password: str
+
+class ChangePasswordBody(BaseModel):
+    old_password: str
+    new_password: str
+
+class ResetPasswordBody(BaseModel):
+    new_password: str
 
 @app.post("/api/auth/register")
 def register(body: AuthBody, request: Request, response: Response):
@@ -328,7 +365,7 @@ def register(body: AuthBody, request: Request, response: Response):
         if existing:
             return {"error": f"Username '{u}' sudah dipakai"}
         user_count = c.execute("SELECT count(*) AS n FROM users").fetchone()["n"]
-        is_admin_user = (user_count == 0) or (u.lower() in ("admin", "rangga"))
+        is_admin_user = (user_count == 0)
         user_row = c.execute(
             "INSERT INTO users(username, password_hash, salt, is_admin) VALUES (%s, %s, %s, %s) RETURNING id, username, is_admin",
             (u, pw_hash, salt, is_admin_user)
@@ -385,6 +422,25 @@ def logout(request: Request, response: Response):
 def me(request: Request):
     user = get_current_user(request)
     return {"user": user}
+
+@app.post("/api/auth/change-password")
+def change_password(body: ChangePasswordBody, request: Request):
+    user = get_current_user(request)
+    if not user:
+        return Response(status_code=401, content=json.dumps({"error": "Silakan login terlebih dahulu"}), media_type="application/json")
+    old_p = body.old_password or ""
+    new_p = body.new_password or ""
+    if len(new_p) < 8:
+        return Response(status_code=400, content=json.dumps({"error": "Password baru minimal 8 karakter"}), media_type="application/json")
+    client_ip = get_client_ip(request)
+    with conn() as c, c.transaction():
+        row = c.execute("SELECT password_hash, salt FROM users WHERE id = %s", (user["id"],)).fetchone()
+        if not row or not verify_password(old_p, row["salt"], row["password_hash"]):
+            return Response(status_code=400, content=json.dumps({"error": "Password lama tidak sesuai"}), media_type="application/json")
+        new_hash, new_salt = hash_password(new_p)
+        c.execute("UPDATE users SET password_hash = %s, salt = %s WHERE id = %s", (new_hash, new_salt, user["id"]))
+        log_activity(user["id"], user["username"], "CHANGE_PASSWORD", "Pengguna mengubah kata sandi akun", client_ip)
+    return {"ok": True, "message": "Kata sandi berhasil diperbarui"}
 
 @app.get("/api/users")
 def list_users():
@@ -979,12 +1035,13 @@ def api_list(request: Request, page: int = 1, size: int = 50, q: str = "", appro
     return {"total": total, "page": page, "size": size, "items": rows, "pending": pending}
 
 @app.get("/api/export/csv")
-def export_csv(request: Request, q: str = "", approved: str = "", user_filter: str = "", sort: str = "name_asc", completeness: str = ""):
+def export_csv(request: Request, q: str = "", approved: str = "", user_filter: str = "", sort: str = "name_asc", completeness: str = "", format: str = "matrix"):
     q = (q or "").strip()
     approved = (approved or "").strip()
     user_filter = (user_filter or "").strip()
     sort = (sort or "name_asc").strip().lower()
     completeness = (completeness or "").strip().lower()
+    format = (format or "matrix").strip().lower()
 
     if sort == "name_desc":
         order_clause = "CASE WHEN i.name IS NULL OR trim(i.name) = '' THEN 1 ELSE 0 END, lower(i.name) DESC, i.id DESC"
@@ -1034,7 +1091,7 @@ def export_csv(request: Request, q: str = "", approved: str = "", user_filter: s
     if not tokens:
         where_clause = ("WHERE " + " AND ".join(extra_filters)) if extra_filters else ""
         query_sql = f"""
-            SELECT i.name, co.name AS company, p.pn, p.seq,
+            SELECT i.id, i.name, co.name AS company, p.pn, p.seq,
                    COALESCE(ub.username, u.username, '') AS author,
                    CASE WHEN i.approved_by IS NOT NULL THEN 'Disetujui' ELSE 'Belum Disetujui' END AS status_approve,
                    COALESCE(ua.username, '') AS approved_by,
@@ -1046,7 +1103,7 @@ def export_csv(request: Request, q: str = "", approved: str = "", user_filter: s
             JOIN part_numbers p ON p.item_id = i.id
             JOIN companies co ON co.id = p.company_id
             {where_clause}
-            ORDER BY {order_clause}, co.id, p.seq
+            ORDER BY {order_clause}, i.id, co.id, p.seq
         """
         params = extra_params
     elif len(tokens) == 1:
@@ -1058,7 +1115,7 @@ def export_csv(request: Request, q: str = "", approved: str = "", user_filter: s
               SELECT item_id AS id FROM part_numbers p JOIN items i ON i.id = p.item_id WHERE %(qn)s <> '' AND p.pn_norm LIKE '%%' || %(qn)s || '%%' {filt_and}
               UNION
               SELECT id FROM items i WHERE i.name ILIKE '%%' || %(q)s || '%%' {filt_and})
-            SELECT i.name, co.name AS company, p.pn, p.seq,
+            SELECT i.id, i.name, co.name AS company, p.pn, p.seq,
                    COALESCE(ub.username, u.username, '') AS author,
                    CASE WHEN i.approved_by IS NOT NULL THEN 'Disetujui' ELSE 'Belum Disetujui' END AS status_approve,
                    COALESCE(ua.username, '') AS approved_by,
@@ -1070,7 +1127,7 @@ def export_csv(request: Request, q: str = "", approved: str = "", user_filter: s
             LEFT JOIN users ua ON ua.id = i.approved_by
             JOIN part_numbers p ON p.item_id = i.id
             JOIN companies co ON co.id = p.company_id
-            ORDER BY {order_clause}, co.id, p.seq
+            ORDER BY {order_clause}, i.id, co.id, p.seq
         """
     else:
         token_where, token_params = build_search_filter(q)
@@ -1081,7 +1138,7 @@ def export_csv(request: Request, q: str = "", approved: str = "", user_filter: s
             WITH hit AS (
               SELECT i.id FROM items i
               {where_clause})
-            SELECT i.name, co.name AS company, p.pn, p.seq,
+            SELECT i.id, i.name, co.name AS company, p.pn, p.seq,
                    COALESCE(ub.username, u.username, '') AS author,
                    CASE WHEN i.approved_by IS NOT NULL THEN 'Disetujui' ELSE 'Belum Disetujui' END AS status_approve,
                    COALESCE(ua.username, '') AS approved_by,
@@ -1093,40 +1150,81 @@ def export_csv(request: Request, q: str = "", approved: str = "", user_filter: s
             LEFT JOIN users ua ON ua.id = i.approved_by
             JOIN part_numbers p ON p.item_id = i.id
             JOIN companies co ON co.id = p.company_id
-            ORDER BY {order_clause}, co.id, p.seq
+            ORDER BY {order_clause}, i.id, co.id, p.seq
         """
 
     def iter_csv():
         out = io.StringIO()
         writer = csv.writer(out)
         yield "\ufeff"
-        writer.writerow(["Barang", "Company", "PN", "Urutan", "Diupdate Oleh", "Status Approve", "Disetujui Oleh", "Tanggal Approve"])
-        yield out.getvalue()
-        out.seek(0)
-        out.truncate(0)
 
         with conn() as c:
-            cursor = c.execute(query_sql, params)
-            while True:
-                batch = cursor.fetchmany(1000)
-                if not batch:
-                    break
-                for r in batch:
-                    writer.writerow([
-                        r["name"] or "",
-                        r["company"] or "",
-                        r["pn"] or "",
-                        "Utama" if r["seq"] == 0 else "Pengganti",
-                        r["author"] or "",
-                        r["status_approve"] or "",
-                        r["approved_by"] or "",
-                        r["approved_at"] or ""
-                    ])
+            if format == "matrix":
+                comps = [r["name"] for r in c.execute("SELECT name FROM companies ORDER BY id").fetchall()]
+                writer.writerow(["nama barang", *comps])
                 yield out.getvalue()
                 out.seek(0)
                 out.truncate(0)
 
-    filename = f"compare-pn-export-{datetime.now().strftime('%Y%m%d-%H%M')}.csv"
+                cursor = c.execute(query_sql, params)
+                curr_id = None
+                curr_name = ""
+                curr_pns = {}
+
+                while True:
+                    batch = cursor.fetchmany(1000)
+                    if not batch:
+                        break
+                    for r in batch:
+                        row_id = r["id"]
+                        if curr_id is not None and row_id != curr_id:
+                            writer.writerow([curr_name, *[";".join(curr_pns.get(co, [])) for co in comps]])
+                            curr_pns = {}
+                        curr_id = row_id
+                        curr_name = r["name"] or ""
+                        co = r["company"]
+                        if co not in curr_pns:
+                            curr_pns[co] = []
+                        if r["pn"]:
+                            curr_pns[co].append(r["pn"])
+                    if curr_id is not None and out.tell() > 0:
+                        yield out.getvalue()
+                        out.seek(0)
+                        out.truncate(0)
+
+                if curr_id is not None:
+                    writer.writerow([curr_name, *[";".join(curr_pns.get(co, [])) for co in comps]])
+                    yield out.getvalue()
+                    out.seek(0)
+                    out.truncate(0)
+            else:
+                writer.writerow(["Barang", "Company", "PN", "Urutan", "Diupdate Oleh", "Status Approve", "Disetujui Oleh", "Tanggal Approve"])
+                yield out.getvalue()
+                out.seek(0)
+                out.truncate(0)
+
+                cursor = c.execute(query_sql, params)
+                while True:
+                    batch = cursor.fetchmany(1000)
+                    if not batch:
+                        break
+                    for r in batch:
+                        writer.writerow([
+                            r["name"] or "",
+                            r["company"] or "",
+                            r["pn"] or "",
+                            "Utama" if r["seq"] == 0 else "Pengganti",
+                            r["author"] or "",
+                            r["status_approve"] or "",
+                            r["approved_by"] or "",
+                            r["approved_at"] or ""
+                        ])
+                    yield out.getvalue()
+                    out.seek(0)
+                    out.truncate(0)
+
+    file_tag = "matriks" if format == "matrix" else "detail"
+    filename = f"compare-pn-{file_tag}-{datetime.now().strftime('%Y%m%d-%H%M')}.csv"
     return StreamingResponse(
         iter_csv(),
         media_type="text/csv; charset=utf-8",
@@ -1215,6 +1313,25 @@ def admin_delete_user(user_id: int, request: Request):
             client_ip
         )
     return {"ok": True, "message": f"Akun pengguna '{target['username']}' berhasil dihapus"}
+
+@app.post("/api/admin/users/{user_id}/reset-password")
+def admin_reset_password(user_id: int, body: ResetPasswordBody, request: Request):
+    user = get_current_user(request)
+    if not user or not user.get("is_admin"):
+        return Response(status_code=403, content=json.dumps({"error": "Akses khusus admin"}), media_type="application/json")
+    new_p = body.new_password or ""
+    if len(new_p) < 8:
+        return Response(status_code=400, content=json.dumps({"error": "Password baru minimal 8 karakter"}), media_type="application/json")
+    client_ip = get_client_ip(request)
+    with conn() as c, c.transaction():
+        target = c.execute("SELECT id, username FROM users WHERE id = %s", (user_id,)).fetchone()
+        if not target:
+            return Response(status_code=404, content=json.dumps({"error": "User tidak ditemukan"}), media_type="application/json")
+        new_hash, new_salt = hash_password(new_p)
+        c.execute("UPDATE users SET password_hash = %s, salt = %s WHERE id = %s", (new_hash, new_salt, user_id))
+        c.execute("DELETE FROM sessions WHERE user_id = %s", (user_id,))
+        log_activity(user["id"], user["username"], "RESET_USER_PASSWORD", f"Admin mereset kata sandi user '{target['username']}' (ID: {user_id})", client_ip)
+    return {"ok": True, "message": f"Kata sandi pengguna '{target['username']}' berhasil diperbarui"}
 
 @app.get("/api/admin/sessions")
 def admin_sessions(request: Request):

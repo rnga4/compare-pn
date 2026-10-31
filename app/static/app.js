@@ -182,6 +182,16 @@ async function loadMeta(){
   if(s) s.textContent=`${fmt(STATS.items)} barang · ${fmt(STATS.pns)} PN · ${STATS.companies} company`;
   const cl=$('#cl');
   if(cl) cl.innerHTML=COMPS.map(c=>`<option value="${esc(c)}">`).join('');
+  await loadNameSuggestions();
+}
+async function loadNameSuggestions(q=''){
+  try{
+    const names = await jget('/api/suggest/names?q='+encodeURIComponent(q));
+    const nl = $('#nl');
+    if(nl && Array.isArray(names)){
+      nl.innerHTML = names.map(n=>`<option value="${esc(n)}">`).join('');
+    }
+  }catch(e){}
 }
 const changed=async()=>{await loadMeta();document.dispatchEvent(new Event('data-changed'))};
 
@@ -927,7 +937,7 @@ function chrome(){
   applyNekoState(nekoInit, false);
 
   document.body.insertAdjacentHTML('beforeend',`
-  <datalist id="cl"></datalist><div id="toasts" popover="manual"></div>
+  <datalist id="cl"></datalist><datalist id="nl"></datalist><div id="toasts" popover="manual"></div>
   <div id="rowActionMenu" class="menu-dropdown row-action-popup" hidden>
     <button class="menu-item" id="rowActApprove" type="button">
       <span class="menu-item-label" id="rowActApproveLabel">Approve</span>
@@ -1166,7 +1176,7 @@ function chrome(){
   </dialog>
   <dialog id="dAdd">
     <div class="dh"><h3>Tambah barang</h3><button class="x" id="aX" aria-label="Tutup">×</button></div>
-    <div class="lb">Nama barang (opsional)</div><input id="aNm" autocomplete="off">
+    <div class="lb">Nama barang (opsional)</div><input id="aNm" list="nl" autocomplete="off" placeholder="Ketik atau pilih saran nama barang...">
     <div class="lb">PN per company</div>
     <div id="aRows"></div>
     <button class="btn sm" id="aMore">+ company lain</button>
@@ -1176,7 +1186,7 @@ function chrome(){
   </dialog>
   <dialog id="dEdit">
     <div class="dh"><h3>Edit barang</h3><button class="x" id="eX" aria-label="Tutup">×</button></div>
-    <div class="lb">Nama barang (opsional)</div><input id="eNm" autocomplete="off">
+    <div class="lb">Nama barang (opsional)</div><input id="eNm" list="nl" autocomplete="off" placeholder="Ketik atau pilih saran nama barang...">
     <div class="lb">PN per company</div>
     <div id="eRows"></div>
     <button class="btn sm" id="eMore">+ company lain</button>
@@ -1665,6 +1675,7 @@ function chrome(){
         return;
       }
       $('#eNm').value=r.name||'';
+      loadNameSuggestions(r.name||'');
       if(r.entries && r.entries.length){
         r.entries.forEach(en=>addEditRow(en.company,true,en.pns||''));
       }else{
@@ -1906,6 +1917,7 @@ function chrome(){
       return;
     }
     $('#aNm').value='';$('#aMsg').textContent='';$('#aRows').innerHTML='';
+    loadNameSuggestions('');
     COMPS.forEach(c=>addRow(c,true));if(!COMPS.length){addRow('',false);addRow('',false)}
     $('#dAdd').showModal();($('#aRows .p')||$('#aNm')).focus();
   };
@@ -1941,6 +1953,16 @@ function chrome(){
   $('#aSave').onclick=()=>save(false);$('#aSave2').onclick=()=>save(true);
   $('#aMore').onclick=()=>{addRow('',false);$$('#aRows .c').pop().focus()};
   $('#aRows').addEventListener('click',e=>{if(e.target.classList.contains('x'))e.target.closest('.r').remove()});
+
+  let suggestTimer = null;
+  const onNameInput = e => {
+    clearTimeout(suggestTimer);
+    const val = e.target.value.trim();
+    suggestTimer = setTimeout(() => loadNameSuggestions(val), 200);
+  };
+  const aNmEl = $('#aNm'); if(aNmEl) aNmEl.addEventListener('input', onNameInput);
+  const eNmEl = $('#eNm'); if(eNmEl) eNmEl.addEventListener('input', onNameInput);
+
   $('#dAdd').addEventListener('keydown',e=>{
     if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();save(true);return}
     if(e.key==='Enter'&&e.target.classList.contains('p')){

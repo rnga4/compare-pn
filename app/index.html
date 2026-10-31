@@ -2,12 +2,8 @@
 <html lang="id"><head><meta charset="utf-8"><title>Compare PN</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233b82f6'/%3E%3Ctext x='50%25' y='54%25' font-family='Inter,Arial,sans-serif' font-size='28' font-weight='700' fill='white' text-anchor='middle'%3EPN%3C/text%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261029_6">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233b82f6'/%3E%3Ctext x='50%25' y='54%25' font-family='sans-serif' font-size='28' font-weight='700' fill='white' text-anchor='middle'%3EPN%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css?v=20261029_7">
 </head>
 <body data-page="search"><header id="nav"></header>
 <main>
@@ -62,7 +58,7 @@
   <div id="empty"></div>
 </main>
 <script src="/static/neko.js"></script>
-<script src="/static/app.js?v=20261029_6"></script><script src="/static/toast.js"></script>
+<script src="/static/app.js?v=20261029_7"></script><script src="/static/toast.js"></script>
 <script>
 let t,seq=0;
 const EMPTY_DB=`<div class="cta"><h3>Belum ada data</h3><div class="mu">Mulai dengan salah satu cara ini:</div>
@@ -106,22 +102,27 @@ $('#expCsv').onclick=()=>{
     toast.info('Tidak ada data pencarian untuk diekspor');
     return;
   }
-  const rows=[['Barang','Company','PN','Urutan','Diupdate Oleh']];
-  const ths=Array.from(document.querySelectorAll('#head th'));
+  const comps = (window.COMPS && window.COMPS.length) ? window.COMPS : Array.from(document.querySelectorAll('#head th')).slice(1, -1).map(th => th.textContent.trim()).filter(Boolean);
+  const rows = [['nama barang', ...comps]];
+  const ths = Array.from(document.querySelectorAll('#head th'));
   document.querySelectorAll('#body tr').forEach(tr=>{
-    const nm=tr.querySelector('.nm')?.textContent.replace(/^\d+\s*/,'').trim()||'';
-    const author=tr.querySelector('.author-col')?.textContent.trim()||'';
+    const nm = tr.querySelector('.nm')?.textContent.replace(/^\d+\s*/,'').trim()||'';
+    const compPns = {};
     tr.querySelectorAll('.pn').forEach(pn=>{
-      const td=pn.closest('td');
-      const colIndex=td?Array.from(tr.children).indexOf(td):-1;
-      const comp=colIndex>=0&&ths[colIndex]?ths[colIndex].textContent.trim():'';
-      rows.push([nm,comp,pn.dataset.pn,pn.classList.contains('main')?'0':'1',author]);
+      const td = pn.closest('td');
+      const colIndex = td ? Array.from(tr.children).indexOf(td) : -1;
+      const comp = colIndex >= 0 && ths[colIndex] ? ths[colIndex].textContent.trim() : '';
+      if(comp){
+        if(!compPns[comp]) compPns[comp] = [];
+        compPns[comp].push(pn.dataset.pn || pn.textContent.trim());
+      }
     });
+    rows.push([nm, ...comps.map(c => (compPns[c] || []).join(';'))]);
   });
   const csv=rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}));
-  a.download='hasil-pencarian.csv';a.click();
+  a.download='hasil-pencarian-matriks.csv';a.click();
 };
 $('#cpyAll').onclick=()=>{
   const list=[];
